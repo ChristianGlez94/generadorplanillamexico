@@ -18,6 +18,10 @@ app.use((_req, res, next) => {
 app.use(express.json({ limit: "2mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
+app.get("/health", (_req, res) => {
+  res.status(200).json({ ok: true });
+});
+
 app.get("/api/countries", (_req, res) => {
   res.json({
     countries: countryList,
