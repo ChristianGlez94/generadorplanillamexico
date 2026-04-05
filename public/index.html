@@ -1,0 +1,502 @@
+﻿<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Herramienta para el llenado de la solicitud de visa para entrar a México</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700&family=Libre+Baskerville:wght@700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="background-glow" aria-hidden="true"></div>
+
+    <main class="layout">
+      <header class="hero">
+        <p class="eyebrow">Herramienta de apoyo para solicitantes</p>
+        <h1>Herramienta para el llenado de la solicitud de visa para entrar a México</h1>
+        <p>
+          Esta herramienta es de apoyo y no sustituye los canales oficiales del consulado. No
+          somos responsables por errores que pudieran generarse y es responsabilidad de cada
+          usuario verificar la correcta emisión de la planilla.
+        </p>
+        <nav class="hero-nav" aria-label="Enlaces del sitio">
+          <a href="/">Formulario</a>
+          <a href="/sobre-esta-herramienta.html">Sobre esta herramienta</a>
+          <a href="/contacto.html">Contacto</a>
+          <a href="/politica-privacidad.html">Privacidad</a>
+          <a href="/terminos-condiciones.html">Términos</a>
+          <a href="/aviso-responsabilidad.html">Responsabilidad</a>
+        </nav>
+      </header>
+
+      <form id="visaForm" novalidate>
+        <section class="card">
+          <h2>Datos Consulares</h2>
+          <div class="grid two">
+            <label>
+              Oficina Consular en
+              <select name="oficinaConsularMode" id="oficinaConsularMode" required>
+                <option value="LA_HABANA">La Habana, Cuba</option>
+                <option value="OTRA">Otra (escribir manualmente)</option>
+              </select>
+            </label>
+
+            <label id="officeTextWrap" class="hidden">
+              Oficina Consular (texto libre)
+              <input
+                type="text"
+                name="oficinaConsularTexto"
+                id="oficinaConsularTexto"
+                maxlength="80"
+                placeholder="Ejemplo: Ciudad de México"
+              />
+            </label>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>I. Información Personal</h2>
+          <div class="grid three">
+            <label>
+              1. Nombre(s)
+              <input type="text" name="nombres" maxlength="80" required />
+            </label>
+            <label>
+              2. Primer apellido
+              <input type="text" name="primerApellido" maxlength="60" required />
+            </label>
+            <label>
+              3. Segundo apellido
+              <input type="text" name="segundoApellido" maxlength="60" required />
+            </label>
+          </div>
+
+          <div class="grid three">
+            <label>
+              4. Sexo
+              <select name="sexo" required>
+                <option value="FEMENINO">Femenino</option>
+                <option value="MASCULINO">Masculino</option>
+                <option value="NO_ESPECIFICA">Elige no especificar</option>
+              </select>
+            </label>
+            <label>
+              5. Fecha de nacimiento
+              <input
+                type="text"
+                name="fechaNacimiento"
+                id="fechaNacimiento"
+                maxlength="10"
+                inputmode="numeric"
+                pattern="\d{2}/\d{2}/\d{4}"
+                placeholder="dd/mm/aaaa"
+                required
+              />
+            </label>
+            <label>
+              6. País de nacimiento
+              <select name="paisNacimiento" id="paisNacimiento" required>
+                <option value="">Cargando países...</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="grid two">
+            <label>
+              7. Nacionalidad
+              <select name="nacionalidadMode" id="nacionalidadMode" required>
+                <option value="Cubana">Cubana</option>
+                <option value="OTRA">Otra (escribir manualmente)</option>
+              </select>
+            </label>
+            <label id="nacionalidadOtraWrap" class="hidden">
+              Otra nacionalidad
+              <input
+                type="text"
+                name="nacionalidadOtra"
+                id="nacionalidadOtra"
+                maxlength="35"
+                placeholder="Ejemplo: Mexicana, Canadiense"
+                disabled
+              />
+            </label>
+          </div>
+
+          <div class="grid three">
+            <label>
+              8. Número de pasaporte
+              <input type="text" name="numeroPasaporte" maxlength="25" required />
+            </label>
+            <label>
+              9. Tipo de pasaporte
+              <select name="tipoPasaporte" required>
+                <option value="ORDINARIO">Ordinario</option>
+                <option value="NO_ORDINARIO">No ordinario</option>
+                <option value="LAISSEZ_PASSER">Laissez-Passer</option>
+              </select>
+            </label>
+            <label>
+              País de expedición
+              <select name="paisExpedicion" id="paisExpedicion" required>
+                <option value="">Cargando países...</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="grid two">
+            <label>
+              Fecha de expedición
+              <input
+                type="text"
+                name="fechaExpedicion"
+                id="fechaExpedicion"
+                maxlength="10"
+                inputmode="numeric"
+                pattern="\d{2}/\d{2}/\d{4}"
+                placeholder="dd/mm/aaaa"
+                required
+              />
+            </label>
+            <label>
+              Fecha de vencimiento
+              <input
+                type="text"
+                name="fechaVencimiento"
+                id="fechaVencimiento"
+                maxlength="10"
+                inputmode="numeric"
+                pattern="\d{2}/\d{2}/\d{4}"
+                placeholder="dd/mm/aaaa"
+                required
+              />
+            </label>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>II. Datos Complementarios</h2>
+          <div class="grid three">
+            <label>
+              10. Estado civil
+              <select name="estadoCivil" required>
+                <option value="SOLTERO">Soltero(a)</option>
+                <option value="CASADO">Casado(a)</option>
+                <option value="CONCUBINATO">Concubinato</option>
+              </select>
+            </label>
+            <label>
+              11. Domicilio actual
+              <input type="text" name="domicilioActual" maxlength="120" required />
+            </label>
+            <label>
+              12. Teléfono
+              <input type="text" name="telefono" maxlength="25" required />
+            </label>
+          </div>
+
+          <div class="grid two">
+            <label>
+              13. Correo electrónico
+              <input type="email" name="correo" id="correo" maxlength="35" required />
+              <small id="correoHint"
+                >Máximo 35 caracteres (2 renglones en la planilla).</small
+              >
+            </label>
+            <label>
+              14. Ocupación
+              <input type="text" name="ocupacion" maxlength="90" required />
+            </label>
+          </div>
+
+          <div class="grid two">
+            <label>
+              15. Nombre de la compañía o institución
+              <input type="text" name="compania" maxlength="120" required />
+            </label>
+            <label>
+              16. Lugar de residencia
+              <input type="text" name="lugarResidencia" maxlength="80" required />
+            </label>
+          </div>
+
+          <div class="grid three">
+            <label>
+              17. Cuenta con legal estancia
+              <select name="cuentaLegalEstancia" required>
+                <option value="SI">Sí</option>
+                <option value="NO">No</option>
+              </select>
+            </label>
+            <label>
+              18. Tiene antecedentes penales
+              <select name="antecedentesPenales" id="antecedentesPenales" required>
+                <option value="NO">No</option>
+                <option value="SI">Sí</option>
+              </select>
+            </label>
+            <label id="antecedentesDetalleWrap" class="hidden">
+              19. En caso afirmativo, especificar
+              <input
+                type="text"
+                name="antecedentesDetalle"
+                id="antecedentesDetalle"
+                maxlength="120"
+                placeholder="Se habilita solo si responde SI en el punto 18"
+                disabled
+              />
+            </label>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>III. Información y Motivo de Viaje</h2>
+          <div class="grid two">
+            <label>
+              20. Tipo de visa
+              <select name="tipoVisa" required>
+                <option value="VISITANTE_SIN_PERMISO">
+                  Visitante sin permiso para actividades remuneradas
+                </option>
+                <option value="VISITANTE_SIN_PERMISO_LARGA_DURACION">
+                  Visitante sin permiso (larga duración)
+                </option>
+                <option value="VISITANTE_CON_PERMISO">
+                  Visitante con permiso para actividades remuneradas
+                </option>
+                <option value="VISITANTE_ADOPCION">Visitante para trámites de adopción</option>
+                <option value="RESIDENTE_TEMPORAL_ESTUDIANTE">Residente temporal estudiante</option>
+                <option value="RESIDENTE_TEMPORAL">Residente temporal</option>
+                <option value="RESIDENTE_PERMANENTE">Residente permanente</option>
+                <option value="DIPLOMATICA">Diplomática</option>
+                <option value="OFICIAL">Oficial</option>
+                <option value="SERVICIO">Servicio</option>
+              </select>
+            </label>
+            <label>
+              21. Fecha de ingreso a México
+              <input
+                type="text"
+                name="fechaIngresoMexico"
+                id="fechaIngresoMexico"
+                maxlength="10"
+                inputmode="numeric"
+                pattern="\d{2}/\d{2}/\d{4}"
+                placeholder="dd/mm/aaaa"
+                required
+              />
+            </label>
+          </div>
+
+          <div class="grid two">
+            <label>
+              22. Ciudad por la que ingresará
+              <select name="ciudadIngresoMode" id="ciudadIngresoMode" required>
+                <option value="Cancún">Cancún</option>
+                <option value="Monterrey">Monterrey</option>
+                <option value="Mérida">Mérida</option>
+                <option value="Ciudad de México">Ciudad de México</option>
+                <option value="OTRA">Otra (escribir manualmente)</option>
+              </select>
+            </label>
+            <label id="ciudadIngresoManualWrap" class="hidden">
+              Ciudad de ingreso manual
+              <input
+                type="text"
+                name="ciudadIngresoManual"
+                id="ciudadIngresoManual"
+                maxlength="80"
+                placeholder="Escriba la ciudad"
+              />
+            </label>
+          </div>
+
+          <div class="grid three">
+            <label>
+              23. Temporalidad de estancia
+              <select name="temporalidad" required>
+                <option value="MENOR_180">Menor a 180 días</option>
+                <option value="MAYOR_180_HASTA_4">Mayor a 180 días y hasta 4 años</option>
+                <option value="DEFINITIVA">Definitiva</option>
+              </select>
+            </label>
+            <label>
+              24. Ha visitado México
+              <select name="haVisitadoMexico" required>
+                <option value="NO">No</option>
+                <option value="SI">Sí</option>
+              </select>
+            </label>
+            <label>
+              25. Ha sido deportado de México
+              <select name="haSidoDeportado" id="haSidoDeportado" required>
+                <option value="NO">No</option>
+                <option value="SI">Sí</option>
+              </select>
+            </label>
+          </div>
+
+          <label id="causaDeportacionWrap" class="hidden">
+            26. En caso afirmativo, indicar causa
+            <input
+              type="text"
+              name="causaDeportacion"
+              id="causaDeportacion"
+              maxlength="120"
+              placeholder="Se habilita solo si responde SI en el punto 25"
+              disabled
+            />
+          </label>
+
+          <div class="grid two">
+            <label>
+              27. Propósito de viaje
+              <select name="propositoViajeMode" id="propositoViajeMode" required>
+                <option value="Turismo">Turismo</option>
+                <option value="Turismo por Vínculo familiar">Turismo por Vínculo familiar</option>
+                <option value="Vínculo Familiar">Vínculo Familiar</option>
+                <option value="Oferta de Empleo">Oferta de Empleo</option>
+                <option value="Estudios">Estudios</option>
+                <option value="OTRO">Otro (escribir libremente)</option>
+              </select>
+            </label>
+            <label id="propositoViajeManualWrap" class="hidden">
+              Propósito de viaje libre
+              <input
+                type="text"
+                name="propositoViajeManual"
+                id="propositoViajeManual"
+                maxlength="140"
+                placeholder="Escriba el propósito"
+              />
+            </label>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Documentos Adjuntos (5 líneas disponibles)</h2>
+          <p class="handwritten-note">
+            Puedes usar las líneas que necesites y escribir varios documentos en una misma línea, sin
+            sobrepasar el espacio visible en el PDF.
+          </p>
+          <div class="grid one">
+            <label>
+              Línea 1
+              <input
+                type="text"
+                name="doc1"
+                maxlength="120"
+                placeholder="Ejemplo: Pasaporte Original y Copia"
+              />
+            </label>
+            <label>
+              Línea 2
+              <input
+                type="text"
+                name="doc2"
+                maxlength="120"
+                placeholder="Ejemplo: Certificado de Nacimiento Original y Copia"
+              />
+            </label>
+            <label>
+              Línea 3
+              <input
+                type="text"
+                name="doc3"
+                maxlength="120"
+                placeholder="Ejemplo: Residencia Temporal Copia"
+              />
+            </label>
+            <label>
+              Línea 4
+              <input
+                type="text"
+                name="doc4"
+                maxlength="120"
+                placeholder="Ejemplo: Cita impresa"
+              />
+            </label>
+            <label>
+              Línea 5
+              <input
+                type="text"
+                name="doc5"
+                maxlength="120"
+                placeholder="Ejemplo: Planilla de solicitud"
+              />
+            </label>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Lugar y Fecha (Página 2)</h2>
+          <div class="grid two">
+            <label>
+              Lugar
+              <select name="lugarFirmaMode" id="lugarFirmaMode" required>
+                <option value="CONSULADO_HABANA">Consulado de México en La Habana, Cuba</option>
+                <option value="OTRO">Otro (escribir manualmente)</option>
+              </select>
+            </label>
+            <label id="lugarFirmaManualWrap" class="hidden">
+              Lugar manual
+              <input
+                type="text"
+                name="lugarFirmaManual"
+                id="lugarFirmaManual"
+                maxlength="120"
+                placeholder="Escriba el lugar"
+              />
+            </label>
+          </div>
+
+          <label>
+            Fecha
+            <input
+              type="text"
+              name="fechaFirma"
+              id="fechaFirma"
+              maxlength="10"
+              inputmode="numeric"
+              pattern="\d{2}/\d{2}/\d{4}"
+              placeholder="dd/mm/aaaa"
+              required
+            />
+          </label>
+
+          <p class="handwritten-note">
+            Nombre y firma del solicitante se completan a mano en la impresión final.
+          </p>
+        </section>
+
+        <div class="actions">
+          <button type="submit" id="submitBtn">Generar PDF</button>
+          <p id="statusMessage" role="status" aria-live="polite"></p>
+        </div>
+      </form>
+
+      <footer class="site-footer">
+        <p>
+          Esta web es una herramienta informativa y de apoyo para usuarios que desean completar
+          su solicitud. Cada solicitante debe verificar los datos antes de imprimir y presentar
+          su planilla.
+        </p>
+        <div class="footer-links">
+          <a href="/sobre-esta-herramienta.html">Sobre esta herramienta</a>
+          <a href="/contacto.html">Contacto</a>
+          <a href="/politica-privacidad.html">Política de privacidad</a>
+          <a href="/terminos-condiciones.html">Términos y condiciones</a>
+          <a href="/aviso-responsabilidad.html">Aviso de responsabilidad</a>
+        </div>
+      </footer>
+    </main>
+
+    <script src="/app.js?v=20260405_1710" defer></script>
+  </body>
+</html>
+
+
