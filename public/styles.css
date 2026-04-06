@@ -56,8 +56,30 @@ body {
   border: 1px solid rgba(255, 248, 235, 0.2);
 }
 
+.hero-brand {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.55rem;
+}
+
+.hero-logo {
+  width: min(340px, 100%);
+  height: auto;
+  display: block;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.96);
+  padding: 0.3rem 0.45rem;
+  box-shadow: 0 6px 14px rgba(14, 7, 5, 0.2);
+}
+
+.hero-brand-text {
+  flex: 1 1 260px;
+  min-width: 220px;
+}
+
 .hero h1 {
-  margin: 0.35rem 0;
+  margin: 0.2rem 0 0;
   font-family: "Libre Baskerville", Georgia, serif;
   font-size: clamp(1.45rem, 3.5vw, 2rem);
   letter-spacing: 0.02em;
@@ -292,6 +314,15 @@ button:disabled {
   .grid.two,
   .grid.three {
     grid-template-columns: 1fr;
+  }
+
+  .hero-brand {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .hero-logo {
+    width: min(320px, 100%);
   }
 
   .actions {
