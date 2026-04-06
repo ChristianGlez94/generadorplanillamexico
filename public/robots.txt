@@ -1,2 +1,4 @@
 User-agent: *
 Allow: /
+Disallow: /reporteros.html
+Disallow: /_internal/

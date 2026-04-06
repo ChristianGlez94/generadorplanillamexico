@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Panel interno de reporteros</title>
+    <meta name="robots" content="noindex,nofollow,noarchive" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700&family=Libre+Baskerville:wght@700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="background-glow" aria-hidden="true"></div>
+
+    <main class="layout">
+      <header class="hero">
+        <p class="eyebrow">Uso interno</p>
+        <h1>Panel interno de reporteros</h1>
+        <p>Acceso privado para publicar noticias del sitio.</p>
+      </header>
+
+      <section class="card reporter-login-card">
+        <h2>Iniciar sesion</h2>
+        <form id="reporterLoginForm" class="grid one" novalidate>
+          <label for="reporterPassword">
+            Contrasena de reportero
+            <input
+              type="password"
+              id="reporterPassword"
+              name="password"
+              minlength="6"
+              autocomplete="current-password"
+              required
+            />
+          </label>
+          <div class="reporter-login-actions">
+            <button type="submit" id="reporterLoginBtn">Entrar</button>
+            <button type="button" id="reporterLogoutBtn" class="hidden">Cerrar sesion</button>
+          </div>
+          <p id="reporterSessionMessage" role="status" aria-live="polite">
+            Verificando estado de sesion...
+          </p>
+        </form>
+      </section>
+
+      <section id="reporterPostSection" class="card hidden">
+        <h2>Publicar noticia</h2>
+        <p class="handwritten-note">
+          El sistema sube la imagen desde esta computadora y luego publica la noticia.
+        </p>
+
+        <form id="reporterPostForm" class="grid one" novalidate>
+          <div class="grid two">
+            <label for="postTitle">
+              Titulo
+              <input type="text" id="postTitle" name="title" maxlength="140" required />
+            </label>
+            <label for="postCategory">
+              Categoria
+              <input
+                type="text"
+                id="postCategory"
+                name="category"
+                maxlength="60"
+                placeholder="Ejemplo: Requisitos"
+                required
+              />
+            </label>
+          </div>
+
+          <div class="grid two">
+            <label for="postImageFile">
+              Imagen desde la PC (JPG, PNG, WEBP, GIF)
+              <input type="file" id="postImageFile" name="imageFile" accept="image/*" required />
+            </label>
+            <label for="postAlt">
+              Texto alternativo de la imagen
+              <input
+                type="text"
+                id="postAlt"
+                name="alt"
+                maxlength="180"
+                placeholder="Descripcion corta de la imagen"
+                required
+              />
+            </label>
+          </div>
+
+          <div class="grid two">
+            <label for="postDate">
+              Fecha de publicacion
+              <input type="date" id="postDate" name="date" />
+            </label>
+            <label for="postTags">
+              Tags (separados por coma)
+              <input
+                type="text"
+                id="postTags"
+                name="tags"
+                maxlength="240"
+                placeholder="Ejemplo: Documentos, Cita, Pasaporte"
+              />
+            </label>
+          </div>
+
+          <label for="postDescription">
+            Descripcion corta (vista previa)
+            <textarea
+              id="postDescription"
+              name="description"
+              rows="4"
+              maxlength="4000"
+              required
+            ></textarea>
+          </label>
+
+          <label for="postContent">
+            Contenido completo (puedes separar parrafos con lineas en blanco)
+            <textarea id="postContent" name="content" rows="14" maxlength="60000" required></textarea>
+          </label>
+
+          <div class="reporter-submit-row">
+            <button type="submit" id="reporterPostBtn">Publicar noticia</button>
+            <p id="reporterPostMessage" role="status" aria-live="polite"></p>
+          </div>
+        </form>
+
+        <section class="reporter-manage">
+          <div class="reporter-manage-head">
+            <h3>Gestionar publicaciones</h3>
+            <button type="button" id="reporterReloadPostsBtn">Actualizar listado</button>
+          </div>
+          <div id="reporterPostsList" class="reporter-posts-list" aria-live="polite"></div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/_internal/reporteros.js?v=20260406_1115" defer></script>
+  </body>
+</html>

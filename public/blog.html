@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Blog y noticias de interes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700&family=Libre+Baskerville:wght@700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+    <script
+      async
+      src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4829103587402480"
+      crossorigin="anonymous"
+    ></script>
+  </head>
+  <body>
+    <div class="background-glow" aria-hidden="true"></div>
+
+    <main class="layout">
+      <header class="hero">
+        <p class="eyebrow">Contenido informativo</p>
+        <h1>Blog del sitio: noticias y recomendaciones</h1>
+        <p>
+          Aqui puedes encontrar novedades importantes, recordatorios de requisitos y guias utiles
+          para solicitantes.
+        </p>
+        <nav class="hero-nav" aria-label="Enlaces del sitio">
+          <a href="/">Formulario</a>
+          <a href="/sobre-esta-herramienta.html">Sobre esta herramienta</a>
+          <a href="/contacto.html">Contacto</a>
+          <a href="/blog.html">Blog</a>
+          <a href="/politica-privacidad.html">Privacidad</a>
+          <a href="/terminos-condiciones.html">Terminos</a>
+          <a href="/aviso-responsabilidad.html">Responsabilidad</a>
+        </nav>
+      </header>
+
+      <section class="card blog-toolbar">
+        <h2>Busca por palabra o tema</h2>
+        <label class="blog-search-wrap" for="blogSearch">
+          Buscar noticia
+          <input
+            type="search"
+            id="blogSearch"
+            placeholder="Ejemplo: pasaporte, cita, documentos"
+            autocomplete="off"
+          />
+        </label>
+        <div class="blog-meta" aria-live="polite">
+          <p id="blogCount">0 noticias</p>
+          <p id="blogLastUpdate">Ultima actualizacion: --</p>
+        </div>
+        <div id="blogCategories" class="blog-categories" aria-label="Filtrar por categoria"></div>
+      </section>
+
+      <section class="card blog-random">
+        <h2>Idea novedosa: descubrimiento rapido</h2>
+        <p>
+          Pulsa el boton y te sugerimos una noticia aleatoria de la lista activa para consultar en
+          menos de 30 segundos.
+        </p>
+        <div class="blog-random-actions">
+          <button type="button" id="blogRandomBtn">Mostrar noticia aleatoria</button>
+          <p id="blogRandomResult">Aun no se ha elegido ninguna noticia.</p>
+        </div>
+      </section>
+
+      <section class="card blog-featured-wrap">
+        <h2>Noticia destacada</h2>
+        <article id="featuredPost" class="blog-featured" aria-live="polite"></article>
+      </section>
+
+      <section class="card">
+        <h2>Todas las noticias</h2>
+        <div id="blogList" class="blog-list" aria-live="polite"></div>
+      </section>
+
+      <footer class="site-footer">
+        <p>
+          Esta seccion es informativa y de apoyo. Verifica siempre cambios de requisitos en fuentes
+          oficiales antes de tu cita.
+        </p>
+        <div class="footer-links">
+          <a href="/">Volver al formulario</a>
+          <a href="/sobre-esta-herramienta.html">Sobre esta herramienta</a>
+          <a href="/contacto.html">Contacto</a>
+          <a href="/blog.html">Blog</a>
+        </div>
+      </footer>
+    </main>
+
+    <script src="/blog.js?v=20260406_1000" defer></script>
+  </body>
+</html>

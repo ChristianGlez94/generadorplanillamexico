@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Noticia | Blog</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700&family=Libre+Baskerville:wght@700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+    <script
+      async
+      src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4829103587402480"
+      crossorigin="anonymous"
+    ></script>
+  </head>
+  <body>
+    <div class="background-glow" aria-hidden="true"></div>
+
+    <main class="layout">
+      <header class="hero">
+        <p class="eyebrow">Blog</p>
+        <h1>Lectura completa de noticia</h1>
+        <p>Consulta la noticia con todo el detalle disponible.</p>
+        <nav class="hero-nav" aria-label="Enlaces del sitio">
+          <a href="/">Formulario</a>
+          <a href="/blog.html">Blog</a>
+          <a href="/contacto.html">Contacto</a>
+        </nav>
+      </header>
+
+      <section class="card detail-actions">
+        <a class="blog-cta" href="/blog.html">Volver al blog</a>
+      </section>
+
+      <section class="card blog-detail-wrap">
+        <article id="newsDetail" class="blog-detail-card" aria-live="polite">
+          <p class="blog-empty">Cargando noticia...</p>
+        </article>
+      </section>
+
+      <section class="card">
+        <h2>Mas noticias</h2>
+        <div id="relatedNews" class="related-news-list" aria-live="polite"></div>
+      </section>
+
+      <footer class="site-footer">
+        <p>Esta seccion es informativa. Verifica requisitos en fuentes oficiales.</p>
+        <div class="footer-links">
+          <a href="/">Volver al formulario</a>
+          <a href="/blog.html">Blog</a>
+        </div>
+      </footer>
+    </main>
+
+    <script src="/noticia.js?v=20260406_1000" defer></script>
+  </body>
+</html>
