@@ -329,8 +329,10 @@ async function fillVisaPdf(formData) {
 
   const docs = Array.from({ length: 5 }, (_, idx) => normalizeText(formData.documentosAdjuntos[idx] || ""));
   docs.forEach((line, idx) => {
-    drawTextInRect(page2, helvetica, toUpper(line), layout.page2.documentos[idx], {
-      fixedSize: 5.6,
+    // En documentos adjuntos priorizamos mostrar el texto completo ajustando el tamaño.
+    drawTextInRect(page2, helvetica, line, layout.page2.documentos[idx], {
+      maxSize: 5.6,
+      minSize: 4.2,
       clamp: true,
     });
   });
