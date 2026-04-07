@@ -6,3 +6,4 @@ output/
 .env.*
 !.env.example
 .DS_Store
+android-app/

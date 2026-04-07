@@ -270,12 +270,43 @@ function buildPayload(formData) {
   };
 }
 
-function triggerDownload(blob, filename) {
+function blobToBase64Payload(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => {
+      reject(new Error("No se pudo preparar el archivo para descarga."));
+    };
+    reader.onload = () => {
+      const raw = String(reader.result || "");
+      const commaIndex = raw.indexOf(",");
+      resolve(commaIndex >= 0 ? raw.slice(commaIndex + 1) : raw);
+    };
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function triggerDownload(blob, filename) {
+  const safeName = String(filename || "documento.pdf").trim() || "documento.pdf";
+
+  if (
+    window.AndroidBridge &&
+    typeof window.AndroidBridge.downloadPdf === "function" &&
+    String(blob?.type || "").toLowerCase().includes("pdf")
+  ) {
+    try {
+      const base64Payload = await blobToBase64Payload(blob);
+      window.AndroidBridge.downloadPdf(base64Payload, safeName);
+      return;
+    } catch (_error) {
+      // Si falla el puente nativo, usamos el flujo web normal.
+    }
+  }
+
   const link = document.createElement("a");
   const url = URL.createObjectURL(blob);
 
   link.href = url;
-  link.download = filename;
+  link.download = safeName;
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -363,7 +394,7 @@ async function submitForm(event) {
     const blob = await response.blob();
     const passportSlug = String(payload.numeroPasaporte || "visa").replace(/[^a-zA-Z0-9_-]/g, "");
     const timestamp = buildTimestampSuffix();
-    triggerDownload(blob, `solicitud_visa_${passportSlug || "generada"}_${timestamp}.pdf`);
+    await triggerDownload(blob, `solicitud_visa_${passportSlug || "generada"}_${timestamp}.pdf`);
     setStatus("PDF generado correctamente. Revisa y firma a mano.", "ok");
   } catch (error) {
     setStatus(error.message || "No se pudo generar el PDF", "error");
@@ -395,5 +426,4 @@ togglePropositoViajeMode();
 toggleLugarFirmaMode();
 updateEmailHint();
 loadCountries();
-
 
