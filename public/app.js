@@ -288,11 +288,7 @@ function blobToBase64Payload(blob) {
 async function triggerDownload(blob, filename) {
   const safeName = String(filename || "documento.pdf").trim() || "documento.pdf";
 
-  if (
-    window.AndroidBridge &&
-    typeof window.AndroidBridge.downloadPdf === "function" &&
-    String(blob?.type || "").toLowerCase().includes("pdf")
-  ) {
+  if (window.AndroidBridge && typeof window.AndroidBridge.downloadPdf === "function") {
     try {
       const base64Payload = await blobToBase64Payload(blob);
       window.AndroidBridge.downloadPdf(base64Payload, safeName);
@@ -426,4 +422,3 @@ togglePropositoViajeMode();
 toggleLugarFirmaMode();
 updateEmailHint();
 loadCountries();
-
