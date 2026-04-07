@@ -10,6 +10,8 @@ const postSection = document.getElementById("reporterPostSection");
 const postForm = document.getElementById("reporterPostForm");
 const postBtn = document.getElementById("reporterPostBtn");
 const postMessage = document.getElementById("reporterPostMessage");
+const postContentInput = document.getElementById("postContent");
+const insertLinkBtn = document.getElementById("insertLinkBtn");
 const postDateInput = document.getElementById("postDate");
 const postImageFileInput = document.getElementById("postImageFile");
 const reloadPostsBtn = document.getElementById("reporterReloadPostsBtn");
@@ -25,6 +27,8 @@ if (
   postForm &&
   postBtn &&
   postMessage &&
+  postContentInput &&
+  insertLinkBtn &&
   postDateInput &&
   postImageFileInput &&
   reloadPostsBtn &&
@@ -43,6 +47,7 @@ function bindEvents() {
   loginForm.addEventListener("submit", onLoginSubmit);
   logoutBtn.addEventListener("click", onLogoutClick);
   postForm.addEventListener("submit", onCreatePost);
+  insertLinkBtn.addEventListener("click", onInsertLinkClick);
   reloadPostsBtn.addEventListener("click", () => {
     void loadReporterPosts();
   });
@@ -53,6 +58,47 @@ function bindEvents() {
     if (!postId) return;
     void deleteReporterPost(postId, deleteBtn);
   });
+}
+
+function onInsertLinkClick() {
+  const start = Number(postContentInput.selectionStart || 0);
+  const end = Number(postContentInput.selectionEnd || 0);
+  const selectedText = String(postContentInput.value.slice(start, end) || "").trim();
+
+  const rawUrl = window.prompt(
+    "Pega la URL completa del enlace (debe iniciar con http:// o https://):",
+    "https://"
+  );
+  if (rawUrl === null) return;
+
+  const url = String(rawUrl || "").trim();
+  if (!/^https?:\/\/\S+$/i.test(url)) {
+    setPostMessageText("URL invalida. Debe iniciar con http:// o https://", "error");
+    return;
+  }
+
+  const suggestedText = selectedText || "Fuente oficial";
+  const rawLabel = window.prompt("Texto visible del enlace:", suggestedText);
+  if (rawLabel === null) return;
+
+  const label = sanitizeLinkLabel(rawLabel) || url;
+  const markdownLink = `[${label}](${url})`;
+
+  const before = postContentInput.value.slice(0, start);
+  const after = postContentInput.value.slice(end);
+  const needsLeftSpace = before.length > 0 && !/\s$/.test(before);
+  const needsRightSpace = after.length > 0 && !/^\s/.test(after);
+  const textToInsert = `${needsLeftSpace ? " " : ""}${markdownLink}${needsRightSpace ? " " : ""}`;
+
+  postContentInput.focus();
+  if (typeof postContentInput.setRangeText === "function") {
+    postContentInput.setRangeText(textToInsert, start, end, "end");
+  } else {
+    postContentInput.value = `${before}${textToInsert}${after}`;
+  }
+
+  postContentInput.dispatchEvent(new Event("input", { bubbles: true }));
+  setPostMessageText("Enlace insertado en el contenido.", "ok");
 }
 
 async function onLoginSubmit(event) {
@@ -341,8 +387,20 @@ function setPostMessageHtml(html, tone = "") {
   if (tone) postMessage.classList.add(tone);
 }
 
+function sanitizeLinkLabel(value) {
+  return String(value || "")
+    .replace(/\r?\n+/g, " ")
+    .replace(/\[/g, "(")
+    .replace(/\]/g, ")")
+    .trim();
+}
+
 function buildTodayDate() {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function escapeHtml(value) {

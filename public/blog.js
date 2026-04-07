@@ -239,9 +239,19 @@ function normalizePost(post, index) {
 }
 
 function parseDate(value) {
-  const date = new Date(String(value || ""));
+  const raw = String(value || "").trim();
+  const ymdMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (ymdMatch) {
+    const year = Number(ymdMatch[1]);
+    const monthIndex = Number(ymdMatch[2]) - 1;
+    const day = Number(ymdMatch[3]);
+    // Usamos medio dia local para evitar desplazamientos por zona horaria.
+    return new Date(year, monthIndex, day, 12, 0, 0, 0);
+  }
+
+  const date = new Date(raw);
   if (Number.isNaN(date.getTime())) {
-    return new Date("1970-01-01");
+    return new Date(1970, 0, 1, 12, 0, 0, 0);
   }
   return date;
 }

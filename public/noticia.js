@@ -82,10 +82,85 @@ function renderPost(post) {
     </figure>
     <p class="blog-detail-summary">${escapeHtml(post.description)}</p>
     <div class="blog-detail-content">
-      ${paragraphs.map((line) => `<p>${escapeHtml(String(line))}</p>`).join("")}
+      ${paragraphs.map((line) => `<p>${linkifyText(line)}</p>`).join("")}
     </div>
     <div class="blog-tags">${tags}</div>
   `;
+}
+
+function linkifyText(value) {
+  const input = String(value || "");
+  const markdownLinkPattern = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/gi;
+  let html = "";
+  let lastIndex = 0;
+  let match = markdownLinkPattern.exec(input);
+
+  while (match) {
+    const rawMatch = String(match[0] || "");
+    const linkText = String(match[1] || "").trim();
+    const rawUrl = String(match[2] || "");
+    const offset = Number(match.index || 0);
+    const { cleanUrl, suffix } = splitTrailingUrlPunctuation(rawUrl);
+
+    html += linkifyPlainText(input.slice(lastIndex, offset));
+    html += cleanUrl ? buildExternalLink(cleanUrl, linkText || cleanUrl) : escapeHtml(rawMatch);
+
+    if (suffix) {
+      html += escapeHtml(suffix);
+    }
+
+    lastIndex = offset + rawMatch.length;
+    match = markdownLinkPattern.exec(input);
+  }
+
+  html += linkifyPlainText(input.slice(lastIndex));
+  return html;
+}
+
+function linkifyPlainText(value) {
+  const input = String(value || "");
+  const urlPattern = /https?:\/\/[^\s<>"']+/gi;
+  let html = "";
+  let lastIndex = 0;
+  let match = urlPattern.exec(input);
+
+  while (match) {
+    const rawUrl = String(match[0] || "");
+    const offset = Number(match.index || 0);
+    const { cleanUrl, suffix } = splitTrailingUrlPunctuation(rawUrl);
+
+    html += escapeHtml(input.slice(lastIndex, offset));
+
+    html += cleanUrl ? buildExternalLink(cleanUrl, cleanUrl) : escapeHtml(rawUrl);
+
+    if (suffix) {
+      html += escapeHtml(suffix);
+    }
+
+    lastIndex = offset + rawUrl.length;
+    match = urlPattern.exec(input);
+  }
+
+  html += escapeHtml(input.slice(lastIndex));
+  return html;
+}
+
+function buildExternalLink(url, label) {
+  const safeUrl = escapeHtml(String(url || ""));
+  const safeLabel = escapeHtml(String(label || ""));
+  return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${safeLabel}</a>`;
+}
+
+function splitTrailingUrlPunctuation(url) {
+  let cleanUrl = String(url || "");
+  let suffix = "";
+
+  while (/[),.;:!?]$/.test(cleanUrl)) {
+    suffix = cleanUrl.slice(-1) + suffix;
+    cleanUrl = cleanUrl.slice(0, -1);
+  }
+
+  return { cleanUrl, suffix };
 }
 
 function renderRelated(currentPost, list) {
@@ -128,8 +203,18 @@ function normalizePost(post) {
 }
 
 function parseDate(value) {
-  const date = new Date(String(value || ""));
-  if (Number.isNaN(date.getTime())) return new Date("1970-01-01");
+  const raw = String(value || "").trim();
+  const ymdMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (ymdMatch) {
+    const year = Number(ymdMatch[1]);
+    const monthIndex = Number(ymdMatch[2]) - 1;
+    const day = Number(ymdMatch[3]);
+    // Usamos medio dia local para evitar desplazamientos por zona horaria.
+    return new Date(year, monthIndex, day, 12, 0, 0, 0);
+  }
+
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return new Date(1970, 0, 1, 12, 0, 0, 0);
   return date;
 }
 

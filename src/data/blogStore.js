@@ -1,7 +1,11 @@
 const fs = require("fs/promises");
 const path = require("path");
 
-const BLOG_FILE_PATH = path.join(__dirname, "blog-posts.json");
+const BUNDLED_BLOG_FILE_PATH = path.join(__dirname, "blog-posts.json");
+const BLOG_STORAGE_DIR = String(process.env.BLOG_STORAGE_DIR || "").trim();
+const BLOG_FILE_PATH = BLOG_STORAGE_DIR
+  ? path.join(path.resolve(BLOG_STORAGE_DIR), "blog-posts.json")
+  : BUNDLED_BLOG_FILE_PATH;
 const MAX_PARAGRAPH_CHARS = 420;
 
 function slugify(input) {
@@ -15,7 +19,11 @@ function slugify(input) {
 }
 
 function todayYmd() {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function normalizeTags(rawTags) {
@@ -87,9 +95,27 @@ function sortByDateDesc(a, b) {
 }
 
 async function ensureStoreExists() {
+  if (BLOG_STORAGE_DIR) {
+    await fs.mkdir(path.dirname(BLOG_FILE_PATH), { recursive: true });
+  }
+
   try {
     await fs.access(BLOG_FILE_PATH);
   } catch (_error) {
+    if (BLOG_FILE_PATH !== BUNDLED_BLOG_FILE_PATH) {
+      try {
+        const bundledRaw = await fs.readFile(BUNDLED_BLOG_FILE_PATH, "utf8");
+        const bundledParsed = JSON.parse(bundledRaw);
+
+        if (Array.isArray(bundledParsed)) {
+          await fs.writeFile(BLOG_FILE_PATH, `${JSON.stringify(bundledParsed, null, 2)}\n`, "utf8");
+          return;
+        }
+      } catch (_copyError) {
+        // Si falla la copia del contenido inicial, continua con archivo vacio.
+      }
+    }
+
     await fs.writeFile(BLOG_FILE_PATH, "[]\n", "utf8");
   }
 }

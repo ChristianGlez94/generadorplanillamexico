@@ -122,6 +122,14 @@
             Contenido completo (puedes separar parrafos con lineas en blanco)
             <textarea id="postContent" name="content" rows="14" maxlength="60000" required></textarea>
           </label>
+          <div class="reporter-link-toolbar">
+            <button type="button" id="insertLinkBtn" class="reporter-link-btn">Insertar enlace</button>
+            <span>Tip: selecciona texto antes de insertar para usarlo como etiqueta del link.</span>
+          </div>
+          <p class="reporter-link-help">
+            Fuentes y links: puedes pegar URL directa como <code>https://...</code> o usar
+            <code>[Texto de la fuente](https://...)</code>. Se mostraran clicables en la noticia.
+          </p>
 
           <div class="reporter-submit-row">
             <button type="submit" id="reporterPostBtn">Publicar noticia</button>
@@ -139,6 +147,6 @@
       </section>
     </main>
 
-    <script src="/_internal/reporteros.js?v=20260406_1115" defer></script>
+    <script src="/_internal/reporteros.js?v=20260407_0945" defer></script>
   </body>
 </html>
