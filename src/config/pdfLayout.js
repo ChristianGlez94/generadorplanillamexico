@@ -9,7 +9,7 @@ const layout = {
 
     nombres: { x: 292, y: 502, w: 360, h: 24 },
     primerApellido: { x: 328, y: 546, w: 210, h: 24 },
-    segundoApellido: { x: 664, y: 546, w: 140, h: 24 },
+    segundoApellido: { x: 664, y: 546, w: 88, h: 24 },
 
     sexoMarks: {
       FEMENINO: { x: 316.5, y: 608.5 },

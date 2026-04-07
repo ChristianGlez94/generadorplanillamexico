@@ -177,6 +177,36 @@ function calculateAge(dateInput) {
   return String(Math.max(0, age));
 }
 
+function getSecondSurnameTextOptions(value) {
+  const clean = toUpper(value);
+  const length = clean.length;
+
+  if (length <= 9) {
+    return {
+      maxSize: 7,
+      minSize: 5.6,
+      clamp: true,
+      baselineAdjust: BODY_TEXT_BASELINE_ADJUST,
+    };
+  }
+
+  if (length <= 14) {
+    return {
+      maxSize: 6.4,
+      minSize: 5,
+      clamp: true,
+      baselineAdjust: BODY_TEXT_BASELINE_ADJUST,
+    };
+  }
+
+  return {
+    maxSize: 6,
+    minSize: 4.4,
+    clamp: true,
+    baselineAdjust: BODY_TEXT_BASELINE_ADJUST,
+  };
+}
+
 async function fillVisaPdf(formData) {
   const templateBytes = fs.readFileSync(templatePath);
   const pdfDoc = await PDFDocument.load(templateBytes);
@@ -210,12 +240,13 @@ async function fillVisaPdf(formData) {
     clamp: true,
     baselineAdjust: BODY_TEXT_BASELINE_ADJUST,
   });
-  drawTextInRect(page1, helveticaBold, toUpper(formData.segundoApellido), layout.page1.segundoApellido, {
-    maxSize: 7,
-    minSize: 5.6,
-    clamp: true,
-    baselineAdjust: BODY_TEXT_BASELINE_ADJUST,
-  });
+  drawTextInRect(
+    page1,
+    helveticaBold,
+    toUpper(formData.segundoApellido),
+    layout.page1.segundoApellido,
+    getSecondSurnameTextOptions(formData.segundoApellido),
+  );
 
   drawMark(page1, helveticaBold, layout.page1.sexoMarks[formData.sexo]);
 
