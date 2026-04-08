@@ -116,21 +116,47 @@ async function syncBundledPostsIntoPersistentStore() {
 
     if (!Array.isArray(bundledParsed) || !Array.isArray(storeParsed)) return;
 
-    const knownIds = new Set(
-      storeParsed.map((item, index) => buildPostIdentity(item, index)).filter(Boolean)
-    );
+    const mergedStore = [...storeParsed];
+    const indexById = new Map();
 
-    const missing = bundledParsed.filter((item, index) => {
-      const identity = buildPostIdentity(item, index);
-      if (!identity || knownIds.has(identity)) return false;
-      knownIds.add(identity);
-      return true;
-    });
+    for (let index = 0; index < mergedStore.length; index += 1) {
+      const identity = buildPostIdentity(mergedStore[index], index);
+      if (identity) {
+        indexById.set(identity, index);
+      }
+    }
 
-    if (!missing.length) return;
+    let hasChanges = false;
 
-    const merged = [...missing, ...storeParsed];
-    await fs.writeFile(BLOG_FILE_PATH, `${JSON.stringify(merged, null, 2)}\n`, "utf8");
+    for (let bundledIndex = 0; bundledIndex < bundledParsed.length; bundledIndex += 1) {
+      const bundledItem = bundledParsed[bundledIndex];
+      const identity = buildPostIdentity(bundledItem, bundledIndex);
+      if (!identity) continue;
+
+      const storeIndex = indexById.get(identity);
+      if (storeIndex === undefined) {
+        // Si falta un post base, lo insertamos al inicio para mantener prioridad de novedades.
+        mergedStore.unshift(bundledItem);
+        hasChanges = true;
+        continue;
+      }
+
+      const current = mergedStore[storeIndex];
+      const updated = {
+        ...current,
+        ...bundledItem,
+        createdAt: String(current?.createdAt || bundledItem?.createdAt || new Date().toISOString()),
+      };
+
+      if (JSON.stringify(updated) !== JSON.stringify(current)) {
+        mergedStore[storeIndex] = updated;
+        hasChanges = true;
+      }
+    }
+
+    if (!hasChanges) return;
+
+    await fs.writeFile(BLOG_FILE_PATH, `${JSON.stringify(mergedStore, null, 2)}\n`, "utf8");
   } catch (_error) {
     // No detenemos la app por fallos de sincronización automática.
   }
