@@ -7,6 +7,7 @@ const BLOG_FILE_PATH = BLOG_STORAGE_DIR
   ? path.join(path.resolve(BLOG_STORAGE_DIR), "blog-posts.json")
   : BUNDLED_BLOG_FILE_PATH;
 const MAX_PARAGRAPH_CHARS = 420;
+let ensureStorePromise = null;
 
 function slugify(input) {
   return String(input || "")
@@ -94,7 +95,48 @@ function sortByDateDesc(a, b) {
   return second.localeCompare(first);
 }
 
-async function ensureStoreExists() {
+function buildIdentitySeed(item, fallbackIndex = 0) {
+  return String(item?.id || item?.title || `noticia-${fallbackIndex + 1}`);
+}
+
+function buildPostIdentity(item, fallbackIndex = 0) {
+  return slugify(buildIdentitySeed(item, fallbackIndex));
+}
+
+async function syncBundledPostsIntoPersistentStore() {
+  if (!BLOG_STORAGE_DIR || BLOG_FILE_PATH === BUNDLED_BLOG_FILE_PATH) return;
+
+  try {
+    const [bundledRaw, storeRaw] = await Promise.all([
+      fs.readFile(BUNDLED_BLOG_FILE_PATH, "utf8"),
+      fs.readFile(BLOG_FILE_PATH, "utf8"),
+    ]);
+    const bundledParsed = JSON.parse(bundledRaw);
+    const storeParsed = JSON.parse(storeRaw);
+
+    if (!Array.isArray(bundledParsed) || !Array.isArray(storeParsed)) return;
+
+    const knownIds = new Set(
+      storeParsed.map((item, index) => buildPostIdentity(item, index)).filter(Boolean)
+    );
+
+    const missing = bundledParsed.filter((item, index) => {
+      const identity = buildPostIdentity(item, index);
+      if (!identity || knownIds.has(identity)) return false;
+      knownIds.add(identity);
+      return true;
+    });
+
+    if (!missing.length) return;
+
+    const merged = [...missing, ...storeParsed];
+    await fs.writeFile(BLOG_FILE_PATH, `${JSON.stringify(merged, null, 2)}\n`, "utf8");
+  } catch (_error) {
+    // No detenemos la app por fallos de sincronizacion automatica.
+  }
+}
+
+async function ensureStoreExistsInner() {
   if (BLOG_STORAGE_DIR) {
     await fs.mkdir(path.dirname(BLOG_FILE_PATH), { recursive: true });
   }
@@ -117,7 +159,21 @@ async function ensureStoreExists() {
     }
 
     await fs.writeFile(BLOG_FILE_PATH, "[]\n", "utf8");
+    return;
   }
+
+  await syncBundledPostsIntoPersistentStore();
+}
+
+async function ensureStoreExists() {
+  if (!ensureStorePromise) {
+    ensureStorePromise = ensureStoreExistsInner().catch((error) => {
+      ensureStorePromise = null;
+      throw error;
+    });
+  }
+
+  await ensureStorePromise;
 }
 
 async function readPosts() {
@@ -134,8 +190,7 @@ async function readPosts() {
       const title = String(item?.title || "").trim();
       if (!title) return null;
 
-      const idSeed = String(item?.id || title || `noticia-${index + 1}`);
-      const id = slugify(idSeed) || `noticia-${index + 1}`;
+      const id = buildPostIdentity(item, index) || `noticia-${index + 1}`;
       const description = collapseSpaces(item?.description || "");
 
       return {
