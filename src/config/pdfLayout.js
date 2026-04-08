@@ -33,7 +33,7 @@ const layout = {
     fechaVencimientoPartes: {
       dia: { x: 434, y: 773, w: 26, h: 24 },
       mes: { x: 530, y: 773, w: 26, h: 24 },
-      anio: { x: 636, y: 773, w: 52, h: 24 },
+      anio: { x: 640, y: 773, w: 52, h: 24 },
     },
 
     estadoCivilMarks: {
@@ -78,7 +78,7 @@ const layout = {
     fechaIngresoPartes: {
       dia: { x: 468, y: 1146, w: 26, h: 24 },
       mes: { x: 588, y: 1146, w: 26, h: 24 },
-      anio: { x: 688, y: 1146, w: 52, h: 24 },
+      anio: { x: 692, y: 1146, w: 52, h: 24 },
     },
     ciudadIngreso: { x: 430, y: 1188, w: 120, h: 22 },
 

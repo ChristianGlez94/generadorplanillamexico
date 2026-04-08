@@ -5,6 +5,7 @@ const { layout } = require("../config/pdfLayout");
 
 const templatePath = path.join(__dirname, "..", "..", "assets", "visa-template.pdf");
 const BODY_TEXT_BASELINE_ADJUST = 8;
+const DOB_FIELDS_BASELINE_ADJUST = 6;
 
 function normalizeText(value) {
   return String(value || "")
@@ -149,16 +150,19 @@ function drawDateParts(page, font, dateInput, partsLayout, options = {}) {
     align: "center",
     maxSize: options.maxSize ?? 7.2,
     minSize: options.minSize ?? 6,
+    baselineAdjust: options.baselineAdjust ?? BODY_TEXT_BASELINE_ADJUST,
   });
   drawTextInRect(page, font, mes, partsLayout.mes, {
     align: "center",
     maxSize: options.maxSize ?? 7.2,
     minSize: options.minSize ?? 6,
+    baselineAdjust: options.baselineAdjust ?? BODY_TEXT_BASELINE_ADJUST,
   });
   drawTextInRect(page, font, anio, partsLayout.anio, {
     align: "center",
     maxSize: options.maxSize ?? 7.2,
     minSize: options.minSize ?? 6,
+    baselineAdjust: options.baselineAdjust ?? BODY_TEXT_BASELINE_ADJUST,
   });
 }
 
@@ -210,9 +214,9 @@ function getSecondSurnameTextOptions(value) {
 async function fillVisaPdf(formData) {
   const templateBytes = fs.readFileSync(templatePath);
   const pdfDoc = await PDFDocument.load(templateBytes);
-  const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  // Fuerza negrita en todos los campos capturados.
-  const helvetica = helveticaBold;
+  const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  // Estilo normal para campos capturados, recomendado para documentos oficiales.
+  const helveticaBold = helvetica;
 
   const [page1, page2] = pdfDoc.getPages();
 
@@ -250,11 +254,14 @@ async function fillVisaPdf(formData) {
 
   drawMark(page1, helveticaBold, layout.page1.sexoMarks[formData.sexo]);
 
-  drawDateParts(page1, helvetica, formData.fechaNacimiento, layout.page1.fechaNacimientoPartes);
+  drawDateParts(page1, helvetica, formData.fechaNacimiento, layout.page1.fechaNacimientoPartes, {
+    baselineAdjust: DOB_FIELDS_BASELINE_ADJUST,
+  });
   drawTextInRect(page1, helvetica, calculateAge(formData.fechaNacimiento), layout.page1.edad, {
     align: "center",
     maxSize: 7.2,
     minSize: 6,
+    baselineAdjust: DOB_FIELDS_BASELINE_ADJUST,
   });
 
   drawTextInRect(page1, helveticaBold, toUpper(formData.paisNacimiento), layout.page1.paisNacimiento, {
@@ -358,7 +365,7 @@ async function fillVisaPdf(formData) {
 
   drawMark(page1, helveticaBold, layout.page1.tipoPasaporteMarks[formData.tipoPasaporte]);
 
-  const docs = Array.from({ length: 5 }, (_, idx) => normalizeText(formData.documentosAdjuntos[idx] || ""));
+  const docs = Array.from({ length: 5 }, (_, idx) => toUpper(formData.documentosAdjuntos[idx] || ""));
   docs.forEach((line, idx) => {
     // En documentos adjuntos priorizamos mostrar el texto completo ajustando el tamaño.
     drawTextInRect(page2, helvetica, line, layout.page2.documentos[idx], {
