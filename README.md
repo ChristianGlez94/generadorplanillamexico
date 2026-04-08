@@ -97,3 +97,31 @@ Con esto, los despliegues o reinicios no eliminan noticias ni imagenes subidas d
 - Rate limiting en login de reportero, escritura de noticias y generacion de PDF.
 - Validacion de imagen por firma binaria real (no solo por extension o MIME declarado).
 - Headers base de seguridad (`nosniff`, `DENY`, `Referrer-Policy`, `Permissions-Policy`).
+
+## App Android (WebView nativa)
+
+Se agrego un proyecto Android en `android-app/` que carga el sitio en una WebView segura y permite descargar el PDF generado en la carpeta de descargas de la app.
+
+### Incluye
+
+- Navegacion dentro de tus dominios permitidos (`planillavisamexico.com`, `www.planillavisamexico.com`, `generadorplanillamexico.onrender.com`).
+- Enlaces externos abiertos fuera de la app.
+- Pull-to-refresh.
+- Fallback automatico de dominio principal a Render si el principal falla.
+- Puente nativo `AndroidBridge.downloadPdf(...)` para guardar PDFs generados desde el formulario web.
+
+### Abrir y compilar
+
+1. Abre Android Studio.
+2. Selecciona `Open` y elige la carpeta `android-app`.
+3. Espera sincronizacion de Gradle.
+4. Ejecuta en emulador/dispositivo (`Run app`) o genera release (`Build > Generate Signed Bundle / APK`).
+
+Tambien puedes compilar por terminal:
+
+```bash
+cd android-app
+./gradlew assembleDebug
+```
+
+APK debug generado en: `android-app/app/build/outputs/apk/debug/app-debug.apk`

@@ -3,8 +3,8 @@ const { z } = require("zod");
 const ymdRegex = /^\d{4}-\d{2}-\d{2}$/;
 
 const blogPostCreateSchema = z.object({
-  title: z.string().trim().min(5, "El titulo debe tener al menos 5 caracteres").max(140),
-  category: z.string().trim().min(3, "La categoria es obligatoria").max(60),
+  title: z.string().trim().min(5, "El título debe tener al menos 5 caracteres").max(140),
+  category: z.string().trim().min(3, "La categoría es obligatoria").max(60),
   image: z
     .string()
     .trim()
@@ -12,13 +12,13 @@ const blogPostCreateSchema = z.object({
     .max(500, "La ruta de imagen es demasiado larga")
     .refine(
       (value) => /^https?:\/\//i.test(value) || value.startsWith("/uploads/"),
-      "La imagen debe ser una URL valida o una imagen subida al servidor."
+      "La imagen debe ser una URL válida o una imagen subida al servidor."
     ),
   alt: z.string().trim().min(5, "El texto alternativo es obligatorio").max(180),
   description: z
     .string()
     .trim()
-    .min(40, "La descripcion debe tener al menos 40 caracteres")
+    .min(40, "La descripción debe tener al menos 40 caracteres")
     .max(4000),
   content: z
     .string()

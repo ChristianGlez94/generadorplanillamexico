@@ -6,6 +6,10 @@ const featuredPost = document.getElementById("featuredPost");
 const blogList = document.getElementById("blogList");
 const blogRandomBtn = document.getElementById("blogRandomBtn");
 const blogRandomResult = document.getElementById("blogRandomResult");
+const blogPagination = document.getElementById("blogPagination");
+const blogPageInfo = document.getElementById("blogPageInfo");
+const blogPrevBtn = document.getElementById("blogPrevBtn");
+const blogNextBtn = document.getElementById("blogNextBtn");
 
 if (
   blogSearch &&
@@ -15,95 +19,157 @@ if (
   featuredPost &&
   blogList &&
   blogRandomBtn &&
-  blogRandomResult
+  blogRandomResult &&
+  blogPagination &&
+  blogPageInfo &&
+  blogPrevBtn &&
+  blogNextBtn
 ) {
   const state = {
     posts: [],
-    filtered: [],
     query: "",
     category: "Todas",
+    page: 1,
+    pageSize: 15,
+    totalItems: 0,
+    totalPages: 1,
+    hasPrevPage: false,
+    hasNextPage: false,
+    availableCategories: [],
+    requestId: 0,
+    loading: false,
   };
 
   init();
   setupCardInteractions(featuredPost);
   setupCardInteractions(blogList);
 
-  async function init() {
-    blogCount.textContent = "Cargando noticias...";
-    blogLastUpdate.textContent = "Ultima actualizacion: --";
-    featuredPost.innerHTML = '<p class="blog-empty">Cargando contenido...</p>';
-    blogList.innerHTML = "";
-
-    try {
-      const posts = await loadPostsFromApi();
-      state.posts = posts;
-      state.filtered = posts;
-
-      renderCategoryButtons();
-      applyFilters();
-    } catch (error) {
-      blogCount.textContent = "0 noticias";
-      featuredPost.innerHTML = `<p class="blog-empty">${escapeHtml(error.message)}</p>`;
-      blogList.innerHTML = "";
-    }
-  }
+  const applySearch = debounce((value) => {
+    state.query = String(value || "");
+    state.page = 1;
+    loadAndRenderPosts();
+  }, 260);
 
   blogSearch.addEventListener("input", (event) => {
-    state.query = String(event.target.value || "");
-    applyFilters();
+    applySearch(event.target.value);
   });
 
   blogCategories.addEventListener("click", (event) => {
     const button = event.target.closest("button[data-category]");
     if (!button) return;
 
-    state.category = button.dataset.category || "Todas";
-    applyFilters();
+    const nextCategory = String(button.dataset.category || "Todas");
+    if (nextCategory === state.category) return;
+
+    state.category = nextCategory;
+    state.page = 1;
+    loadAndRenderPosts();
+  });
+
+  blogPrevBtn.addEventListener("click", () => {
+    if (state.loading || !state.hasPrevPage) return;
+    state.page = Math.max(1, state.page - 1);
+    loadAndRenderPosts();
+  });
+
+  blogNextBtn.addEventListener("click", () => {
+    if (state.loading || !state.hasNextPage) return;
+    state.page += 1;
+    loadAndRenderPosts();
   });
 
   blogRandomBtn.addEventListener("click", () => {
-    if (!state.filtered.length) {
+    if (!state.posts.length) {
       blogRandomResult.textContent = "No hay noticias disponibles con el filtro actual.";
       return;
     }
 
-    const randomPost = state.filtered[Math.floor(Math.random() * state.filtered.length)];
+    const randomPost = state.posts[Math.floor(Math.random() * state.posts.length)];
     const url = `/noticia.html?id=${encodeURIComponent(randomPost.id)}`;
     blogRandomResult.innerHTML = `Sugerencia: <a href="${url}">${escapeHtml(randomPost.title)}</a>`;
   });
 
-  function applyFilters() {
-    const query = state.query.trim().toLowerCase();
-    const category = state.category;
+  async function init() {
+    blogCount.textContent = "Cargando noticias...";
+    blogLastUpdate.textContent = "Última actualización: --";
+    featuredPost.innerHTML = '<p class="blog-empty">Cargando contenido...</p>';
+    blogList.innerHTML = "";
+    renderPagination();
 
-    state.filtered = state.posts.filter((post) => {
-      const textToSearch = [post.title, post.description, post.category, post.tags.join(" ")]
-        .join(" ")
-        .toLowerCase();
+    await loadAndRenderPosts();
+  }
 
-      const matchesQuery = !query || textToSearch.includes(query);
-      const matchesCategory = category === "Todas" || post.category === category;
-      return matchesQuery && matchesCategory;
-    });
+  async function loadAndRenderPosts() {
+    const requestId = state.requestId + 1;
+    state.requestId = requestId;
+    state.loading = true;
+    renderPagination();
 
-    renderCategoryButtons();
-    renderStats();
-    renderFeatured();
-    renderList();
+    try {
+      const data = await loadPostsFromApi({
+        page: state.page,
+        limit: state.pageSize,
+        query: state.query,
+        category: state.category,
+      });
+
+      if (requestId !== state.requestId) return;
+
+      state.posts = data.posts;
+      state.page = data.pagination.page;
+      state.pageSize = data.pagination.limit;
+      state.totalItems = data.pagination.totalItems;
+      state.totalPages = data.pagination.totalPages;
+      state.hasPrevPage = data.pagination.hasPrevPage;
+      state.hasNextPage = data.pagination.hasNextPage;
+      state.availableCategories = data.availableCategories;
+
+      renderCategoryButtons();
+      renderStats();
+      renderFeatured();
+      renderList();
+      renderPagination();
+    } catch (error) {
+      if (requestId !== state.requestId) return;
+
+      state.posts = [];
+      state.totalItems = 0;
+      state.totalPages = 1;
+      state.hasPrevPage = false;
+      state.hasNextPage = false;
+
+      renderCategoryButtons();
+      renderStats();
+      featuredPost.innerHTML = `<p class="blog-empty">${escapeHtml(error.message)}</p>`;
+      blogList.innerHTML = "";
+      renderPagination();
+    } finally {
+      if (requestId === state.requestId) {
+        state.loading = false;
+        renderPagination();
+      }
+    }
   }
 
   function renderStats() {
-    const total = state.filtered.length;
-    const suffix = total === 1 ? "noticia" : "noticias";
-    blogCount.textContent = `${total} ${suffix}`;
+    if (!state.totalItems) {
+      blogCount.textContent = "0 noticias";
+      blogLastUpdate.textContent = "Última actualización: --";
+      return;
+    }
 
-    const reference = state.filtered[0] || state.posts[0];
+    const firstVisible = (state.page - 1) * state.pageSize + 1;
+    const lastVisible = firstVisible + state.posts.length - 1;
+    const suffix = state.totalItems === 1 ? "noticia" : "noticias";
+    blogCount.textContent = `Mostrando ${firstVisible}-${Math.max(firstVisible, lastVisible)} de ${state.totalItems} ${suffix}`;
+
+    const reference = state.posts[0];
     const formatted = reference ? formatDate(reference.date) : "--";
-    blogLastUpdate.textContent = `Ultima actualizacion: ${formatted}`;
+    blogLastUpdate.textContent = `Última actualización: ${formatted}`;
   }
 
   function renderFeatured() {
-    const post = state.filtered[0];
+    const post = state.posts[0];
 
     if (!post) {
       featuredPost.innerHTML = '<p class="blog-empty">No hay noticias para mostrar.</p>';
@@ -114,11 +180,15 @@ if (
   }
 
   function renderList() {
-    const listItems = state.filtered.slice(1);
+    const listItems = state.posts.slice(1);
 
     if (!listItems.length) {
-      blogList.innerHTML =
-        '<p class="blog-empty">No hay mas noticias para este filtro. Prueba otra categoria.</p>';
+      if (state.posts.length) {
+        blogList.innerHTML = '<p class="blog-empty">No hay más noticias en esta página.</p>';
+      } else {
+        blogList.innerHTML =
+          '<p class="blog-empty">No hay noticias para este filtro. Prueba otra categoría o palabra.</p>';
+      }
       return;
     }
 
@@ -126,7 +196,15 @@ if (
   }
 
   function renderCategoryButtons() {
-    const categories = ["Todas", ...new Set(state.posts.map((post) => post.category))];
+    const source = state.availableCategories.length
+      ? state.availableCategories
+      : [...new Set(state.posts.map((post) => post.category).filter(Boolean))];
+
+    const categories = ["Todas", ...source];
+    if (state.category !== "Todas" && !categories.includes(state.category)) {
+      categories.push(state.category);
+    }
+
     blogCategories.innerHTML = categories
       .map((category) => {
         const isActive = category === state.category;
@@ -134,6 +212,17 @@ if (
         return `<button type="button" class="blog-category-btn${activeClass}" data-category="${escapeHtml(category)}">${escapeHtml(category)}</button>`;
       })
       .join("");
+  }
+
+  function renderPagination() {
+    const shouldShow = state.totalItems > 0 && state.totalPages > 1;
+    blogPagination.classList.toggle("hidden", !shouldShow);
+
+    const loadingText = state.loading ? " (cargando...)" : "";
+    blogPageInfo.textContent = `Página ${state.page} de ${state.totalPages}${loadingText}`;
+
+    blogPrevBtn.disabled = state.loading || !state.hasPrevPage;
+    blogNextBtn.disabled = state.loading || !state.hasNextPage;
   }
 
   function buildPostMarkup(post, isFeatured) {
@@ -145,6 +234,8 @@ if (
       .join("");
     const wrapperClass = isFeatured ? "blog-featured-item" : "blog-card";
     const detailUrl = `/noticia.html?id=${encodeURIComponent(post.id)}`;
+    const imageLoading = isFeatured ? "eager" : "lazy";
+    const fetchPriority = isFeatured ? "high" : "low";
 
     return `
       <article
@@ -156,7 +247,13 @@ if (
       >
         <figure class="blog-media">
           <a href="${detailUrl}" class="blog-image-link">
-            <img src="${escapeHtml(post.image)}" alt="${escapeHtml(post.alt)}" loading="lazy" />
+            <img
+              src="${escapeHtml(post.image)}"
+              alt="${escapeHtml(post.alt)}"
+              loading="${imageLoading}"
+              decoding="async"
+              fetchpriority="${fetchPriority}"
+            />
           </a>
         </figure>
         <div>
@@ -201,8 +298,22 @@ function setupCardInteractions(container) {
   });
 }
 
-async function loadPostsFromApi() {
-  const response = await fetch("/api/blog-posts", {
+async function loadPostsFromApi({ page, limit, query, category }) {
+  const params = new URLSearchParams();
+  params.set("page", String(Math.max(1, Number(page) || 1)));
+  params.set("limit", String(Math.max(1, Number(limit) || 15)));
+
+  const trimmedQuery = String(query || "").trim();
+  if (trimmedQuery) {
+    params.set("q", trimmedQuery);
+  }
+
+  const trimmedCategory = String(category || "").trim();
+  if (trimmedCategory && trimmedCategory !== "Todas") {
+    params.set("category", trimmedCategory);
+  }
+
+  const response = await fetch(`/api/blog-posts?${params.toString()}`, {
     headers: {
       Accept: "application/json",
     },
@@ -213,11 +324,42 @@ async function loadPostsFromApi() {
   }
 
   const data = await response.json();
-  const posts = Array.isArray(data?.posts) ? data.posts : [];
+  const rawPosts = Array.isArray(data?.posts) ? data.posts : [];
+  const posts = rawPosts.map((post, index) => normalizePost(post, index));
+  const availableCategories = Array.isArray(data?.availableCategories)
+    ? data.availableCategories.map((item) => String(item || "").trim()).filter(Boolean)
+    : [];
 
-  return posts
-    .map((post, index) => normalizePost(post, index))
-    .sort((a, b) => parseDate(b.date) - parseDate(a.date));
+  return {
+    posts,
+    availableCategories,
+    pagination: normalizePagination(data?.pagination, {
+      requestedPage: page,
+      requestedLimit: limit,
+      itemCount: posts.length,
+    }),
+  };
+}
+
+function normalizePagination(rawPagination, fallback) {
+  const requestedPage = Math.max(1, Number(fallback?.requestedPage) || 1);
+  const requestedLimit = Math.max(1, Number(fallback?.requestedLimit) || 15);
+  const itemCount = Math.max(0, Number(fallback?.itemCount) || 0);
+  const totalItems = Math.max(itemCount, Number(rawPagination?.totalItems) || 0);
+  const limit = Math.max(1, Number(rawPagination?.limit) || requestedLimit);
+  const totalPages = Math.max(1, Number(rawPagination?.totalPages) || Math.ceil(totalItems / limit));
+  const page = Math.min(totalPages, Math.max(1, Number(rawPagination?.page) || requestedPage));
+  const hasPrevPage = page > 1;
+  const hasNextPage = page < totalPages;
+
+  return {
+    page,
+    limit,
+    totalItems,
+    totalPages,
+    hasPrevPage,
+    hasNextPage,
+  };
 }
 
 function normalizePost(post, index) {
@@ -227,7 +369,7 @@ function normalizePost(post, index) {
 
   return {
     id: normalizedId || `post-${index + 1}`,
-    title: String(post?.title || "Noticia sin titulo"),
+    title: String(post?.title || "Noticia sin título"),
     date: String(post?.date || "1970-01-01"),
     category: String(post?.category || "General"),
     image: String(post?.image || ""),
@@ -280,6 +422,21 @@ function estimateReadingTime(content, description) {
     .split(/\s+/)
     .filter(Boolean).length;
   return Math.max(1, Math.round(words / 170));
+}
+
+function debounce(fn, waitMs) {
+  let timeoutId = null;
+
+  return (...args) => {
+    if (timeoutId) {
+      window.clearTimeout(timeoutId);
+    }
+
+    timeoutId = window.setTimeout(() => {
+      timeoutId = null;
+      fn(...args);
+    }, waitMs);
+  };
 }
 
 function escapeHtml(value) {

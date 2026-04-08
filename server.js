@@ -61,23 +61,23 @@ const RATE_LIMIT_CONFIG = {
 
 if (!REPORTER_PASSWORD) {
   console.warn(
-    "[reporteros] REPORTER_PASSWORD no esta configurada. El acceso de reporteros quedara bloqueado."
+    "[reporteros] REPORTER_PASSWORD no está configurada. El acceso de reporteros quedará bloqueado."
   );
 }
 
 if (process.env.NODE_ENV === "production" && isWeakReporterSecret(REPORTER_SESSION_SECRET)) {
   throw new Error(
-    "[security] REPORTER_SESSION_SECRET insegura o ausente en produccion. Usa una clave de al menos 32 caracteres."
+    "[security] REPORTER_SESSION_SECRET insegura o ausente en producción. Usa una clave de al menos 32 caracteres."
   );
 }
 
 if (!process.env.REPORTER_SESSION_SECRET) {
   console.warn(
-    "[reporteros] REPORTER_SESSION_SECRET no esta configurada. Usa una clave larga en produccion."
+    "[reporteros] REPORTER_SESSION_SECRET no está configurada. Usa una clave larga en producción."
   );
 } else if (isWeakReporterSecret(REPORTER_SESSION_SECRET)) {
   console.warn(
-    "[reporteros] REPORTER_SESSION_SECRET es debil para produccion. Recomendado: 32+ caracteres aleatorios."
+    "[reporteros] REPORTER_SESSION_SECRET es débil para producción. Recomendado: 32+ caracteres aleatorios."
   );
 }
 
@@ -276,6 +276,69 @@ function toIsoTimestamp(value) {
   const parsed = new Date(raw);
   if (Number.isNaN(parsed.getTime())) return new Date().toISOString();
   return parsed.toISOString();
+}
+
+function getSingleQueryValue(value) {
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+
+  return value;
+}
+
+function parsePositiveInteger(rawValue, fallback, max = Infinity) {
+  const value = getSingleQueryValue(rawValue);
+  const parsed = Number.parseInt(String(value || "").trim(), 10);
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+
+  return Math.min(parsed, max);
+}
+
+function collectBlogCategories(posts) {
+  const safePosts = Array.isArray(posts) ? posts : [];
+  const categories = new Set();
+
+  for (const post of safePosts) {
+    const category = String(post?.category || "").trim();
+    if (category) {
+      categories.add(category);
+    }
+  }
+
+  return [...categories].sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
+}
+
+function normalizeSearchText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function filterBlogPosts(posts, options = {}) {
+  const safePosts = Array.isArray(posts) ? posts : [];
+  const query = normalizeSearchText(String(options.query || "").trim());
+  const category = normalizeSearchText(String(options.category || "").trim());
+
+  const hasQuery = Boolean(query);
+  const hasCategory = Boolean(category) && category !== "todas";
+
+  if (!hasQuery && !hasCategory) {
+    return safePosts;
+  }
+
+  return safePosts.filter((post) => {
+    const postCategory = normalizeSearchText(String(post?.category || "").trim());
+    const tags = Array.isArray(post?.tags) ? post.tags.join(" ") : "";
+    const text = normalizeSearchText([post?.title, post?.description, post?.category, tags].join(" "));
+
+    const matchesQuery = !hasQuery || text.includes(query);
+    const matchesCategory = !hasCategory || postCategory === category;
+    return matchesQuery && matchesCategory;
+  });
 }
 
 function buildSitemapXml(entries) {
@@ -507,7 +570,7 @@ function detectImageMime(buffer) {
 function requireReporterAuth(req, res, next) {
   if (!isReporterAuthenticated(req)) {
     return res.status(401).json({
-      message: "Debes iniciar sesion en el area de reporteros.",
+      message: "Debes iniciar sesión en el área de reporteros.",
     });
   }
 
@@ -574,10 +637,41 @@ app.get("/sitemap.xml", async (req, res) => {
   }
 });
 
-app.get("/api/blog-posts", async (_req, res) => {
+app.get("/api/blog-posts", async (req, res) => {
   try {
     const posts = await listBlogPosts();
-    return res.json({ posts });
+    const availableCategories = collectBlogCategories(posts);
+    const pageRaw = getSingleQueryValue(req.query.page);
+    const limitRaw = getSingleQueryValue(req.query.limit);
+    const query = String(getSingleQueryValue(req.query.q) || "").trim();
+    const category = String(getSingleQueryValue(req.query.category) || "").trim();
+    const shouldPaginate = pageRaw !== undefined || limitRaw !== undefined || Boolean(query) || Boolean(category);
+
+    if (!shouldPaginate) {
+      return res.json({ posts, availableCategories });
+    }
+
+    const page = parsePositiveInteger(pageRaw, 1);
+    const limit = parsePositiveInteger(limitRaw, 15, 50);
+    const filteredPosts = filterBlogPosts(posts, { query, category });
+    const totalItems = filteredPosts.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / limit));
+    const safePage = Math.min(page, totalPages);
+    const offset = (safePage - 1) * limit;
+    const pagePosts = filteredPosts.slice(offset, offset + limit);
+
+    return res.json({
+      posts: pagePosts,
+      availableCategories,
+      pagination: {
+        page: safePage,
+        limit,
+        totalItems,
+        totalPages,
+        hasPrevPage: safePage > 1,
+        hasNextPage: safePage < totalPages,
+      },
+    });
   } catch (error) {
     console.error("Error leyendo noticias:", error);
     return res.status(500).json({
@@ -592,7 +686,7 @@ app.get("/api/blog-posts/:id", async (req, res) => {
 
     if (!post) {
       return res.status(404).json({
-        message: "No se encontro la noticia solicitada.",
+        message: "No se encontró la noticia solicitada.",
       });
     }
 
@@ -632,7 +726,7 @@ app.get("/api/reporter/session", (req, res) => {
 app.post("/api/reporter/login", withRateLimit("reporter-login", RATE_LIMIT_CONFIG.reporterLogin), (req, res) => {
   if (!REPORTER_PASSWORD) {
     return res.status(503).json({
-      message: "El acceso de reporteros no esta configurado en el servidor.",
+      message: "El acceso de reporteros no está configurado en el servidor.",
     });
   }
 
@@ -641,7 +735,7 @@ app.post("/api/reporter/login", withRateLimit("reporter-login", RATE_LIMIT_CONFI
 
   if (!isValid) {
     return res.status(401).json({
-      message: "Credenciales invalidas.",
+      message: "Credenciales inválidas.",
     });
   }
 
@@ -650,7 +744,7 @@ app.post("/api/reporter/login", withRateLimit("reporter-login", RATE_LIMIT_CONFI
 
   return res.json({
     ok: true,
-    message: "Sesion iniciada.",
+    message: "Sesión iniciada.",
   });
 });
 
@@ -676,7 +770,7 @@ app.post(
 
   if (!dataBase64) {
     return res.status(400).json({
-      message: "La imagen esta vacia o incompleta.",
+      message: "La imagen está vacía o incompleta.",
     });
   }
 
@@ -691,20 +785,20 @@ app.post(
 
   if (!imageBuffer.length) {
     return res.status(400).json({
-      message: "La imagen esta vacia.",
+      message: "La imagen está vacía.",
     });
   }
 
   if (imageBuffer.length > MAX_IMAGE_UPLOAD_BYTES) {
     return res.status(400).json({
-      message: "La imagen supera el limite permitido de 4MB.",
+      message: "La imagen supera el límite permitido de 4MB.",
     });
   }
 
   const detectedMime = detectImageMime(imageBuffer);
   if (!detectedMime || !IMAGE_EXT_BY_MIME[detectedMime]) {
     return res.status(400).json({
-      message: "No se detecto una imagen valida. Usa JPG, PNG, WEBP o GIF reales.",
+      message: "No se detectó una imagen válida. Usa JPG, PNG, WEBP o GIF reales.",
     });
   }
 
@@ -746,7 +840,7 @@ app.post(
 
   if (!parsed.success) {
     return res.status(400).json({
-      message: "Hay campos invalidos o incompletos en la noticia.",
+      message: "Hay campos inválidos o incompletos en la noticia.",
       issues: parsed.error.issues.map((issue) => ({
         path: issue.path.join("."),
         message: issue.message,
@@ -775,7 +869,7 @@ app.delete(
 
     if (!removed) {
       return res.status(404).json({
-        message: "No se encontro la noticia a eliminar.",
+        message: "No se encontró la noticia a eliminar.",
       });
     }
 
@@ -807,7 +901,7 @@ app.post("/api/generate-visa-pdf", withRateLimit("visa-pdf", RATE_LIMIT_CONFIG.g
 
   if (!parsed.success) {
     return res.status(400).json({
-      message: "Hay campos invalidos o incompletos.",
+      message: "Hay campos inválidos o incompletos.",
       issues: parsed.error.issues.map((issue) => ({
         path: issue.path.join("."),
         message: issue.message,
@@ -832,7 +926,7 @@ app.post("/api/generate-visa-pdf", withRateLimit("visa-pdf", RATE_LIMIT_CONFIG.g
   } catch (error) {
     console.error("Error generando PDF:", error);
     return res.status(500).json({
-      message: "No se pudo generar el PDF. Intente de nuevo.",
+      message: "No se pudo generar el PDF. Inténtalo de nuevo.",
     });
   }
 });

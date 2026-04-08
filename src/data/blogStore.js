@@ -132,7 +132,7 @@ async function syncBundledPostsIntoPersistentStore() {
     const merged = [...missing, ...storeParsed];
     await fs.writeFile(BLOG_FILE_PATH, `${JSON.stringify(merged, null, 2)}\n`, "utf8");
   } catch (_error) {
-    // No detenemos la app por fallos de sincronizacion automatica.
+    // No detenemos la app por fallos de sincronización automática.
   }
 }
 
@@ -154,7 +154,7 @@ async function ensureStoreExistsInner() {
           return;
         }
       } catch (_copyError) {
-        // Si falla la copia del contenido inicial, continua con archivo vacio.
+        // Si falla la copia del contenido inicial, continúa con archivo vacío.
       }
     }
 
@@ -182,7 +182,7 @@ async function readPosts() {
   const parsed = JSON.parse(raw);
 
   if (!Array.isArray(parsed)) {
-    throw new Error("El archivo de noticias no tiene un formato valido.");
+    throw new Error("El archivo de noticias no tiene un formato válido.");
   }
 
   return parsed

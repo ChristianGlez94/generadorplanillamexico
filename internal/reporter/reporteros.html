@@ -24,10 +24,10 @@
       </header>
 
       <section class="card reporter-login-card">
-        <h2>Iniciar sesion</h2>
+        <h2>Iniciar sesión</h2>
         <form id="reporterLoginForm" class="grid one" novalidate>
           <label for="reporterPassword">
-            Contrasena de reportero
+            Contraseña de reportero
             <input
               type="password"
               id="reporterPassword"
@@ -39,10 +39,10 @@
           </label>
           <div class="reporter-login-actions">
             <button type="submit" id="reporterLoginBtn">Entrar</button>
-            <button type="button" id="reporterLogoutBtn" class="hidden">Cerrar sesion</button>
+            <button type="button" id="reporterLogoutBtn" class="hidden">Cerrar sesión</button>
           </div>
           <p id="reporterSessionMessage" role="status" aria-live="polite">
-            Verificando estado de sesion...
+            Verificando estado de sesión...
           </p>
         </form>
       </section>
@@ -56,11 +56,11 @@
         <form id="reporterPostForm" class="grid one" novalidate>
           <div class="grid two">
             <label for="postTitle">
-              Titulo
+              Título
               <input type="text" id="postTitle" name="title" maxlength="140" required />
             </label>
             <label for="postCategory">
-              Categoria
+              Categoría
               <input
                 type="text"
                 id="postCategory"
@@ -84,7 +84,7 @@
                 id="postAlt"
                 name="alt"
                 maxlength="180"
-                placeholder="Descripcion corta de la imagen"
+                placeholder="Descripción corta de la imagen"
                 required
               />
             </label>
@@ -92,7 +92,7 @@
 
           <div class="grid two">
             <label for="postDate">
-              Fecha de publicacion
+              Fecha de publicación
               <input type="date" id="postDate" name="date" />
             </label>
             <label for="postTags">
@@ -108,7 +108,7 @@
           </div>
 
           <label for="postDescription">
-            Descripcion corta (vista previa)
+            Descripción corta (vista previa)
             <textarea
               id="postDescription"
               name="description"
@@ -119,7 +119,7 @@
           </label>
 
           <label for="postContent">
-            Contenido completo (puedes separar parrafos con lineas en blanco)
+            Contenido completo (puedes separar párrafos con líneas en blanco)
             <textarea id="postContent" name="content" rows="14" maxlength="60000" required></textarea>
           </label>
           <div class="reporter-link-toolbar">
@@ -128,7 +128,7 @@
           </div>
           <p class="reporter-link-help">
             Fuentes y links: puedes pegar URL directa como <code>https://...</code> o usar
-            <code>[Texto de la fuente](https://...)</code>. Se mostraran clicables en la noticia.
+            <code>[Texto de la fuente](https://...)</code>. Se mostrarán clicables en la noticia.
           </p>
 
           <div class="reporter-submit-row">

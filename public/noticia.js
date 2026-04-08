@@ -10,7 +10,7 @@ async function initDetailPage() {
   const postId = String(params.get("id") || "").trim();
 
   if (!postId) {
-    newsDetail.innerHTML = '<p class="blog-empty">No se especifico la noticia a consultar.</p>';
+    newsDetail.innerHTML = '<p class="blog-empty">No se especificó la noticia a consultar.</p>';
     relatedNews.innerHTML = "";
     return;
   }
@@ -38,7 +38,7 @@ async function loadPost(postId) {
 
   const data = await response.json();
   if (!data?.post) {
-    throw new Error("La noticia no esta disponible.");
+    throw new Error("La noticia no está disponible.");
   }
 
   return normalizePost(data.post);
@@ -170,7 +170,7 @@ function renderRelated(currentPost, list) {
     .slice(0, 3);
 
   if (!related.length) {
-    relatedNews.innerHTML = '<p class="blog-empty">No hay mas noticias para mostrar por ahora.</p>';
+    relatedNews.innerHTML = '<p class="blog-empty">No hay más noticias para mostrar por ahora.</p>';
     return;
   }
 

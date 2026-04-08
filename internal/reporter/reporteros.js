@@ -73,7 +73,7 @@ function onInsertLinkClick() {
 
   const url = String(rawUrl || "").trim();
   if (!/^https?:\/\/\S+$/i.test(url)) {
-    setPostMessageText("URL invalida. Debe iniciar con http:// o https://", "error");
+    setPostMessageText("URL inválida. Debe iniciar con http:// o https://", "error");
     return;
   }
 
@@ -106,12 +106,12 @@ async function onLoginSubmit(event) {
 
   const password = passwordInput.value.trim();
   if (!password) {
-    setSessionMessage("Debes escribir la contrasena.", "error");
+    setSessionMessage("Debes escribir la contraseña.", "error");
     return;
   }
 
   loginBtn.disabled = true;
-  setSessionMessage("Iniciando sesion...");
+  setSessionMessage("Iniciando sesión...");
 
   try {
     const response = await fetch("/api/reporter/login", {
@@ -124,14 +124,14 @@ async function onLoginSubmit(event) {
 
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(data?.message || "No fue posible iniciar sesion.");
+      throw new Error(data?.message || "No fue posible iniciar sesión.");
     }
 
     passwordInput.value = "";
-    setSessionMessage("Sesion iniciada correctamente.", "ok");
+    setSessionMessage("Sesión iniciada correctamente.", "ok");
     await refreshSession();
   } catch (error) {
-    setSessionMessage(error.message || "Error iniciando sesion.", "error");
+    setSessionMessage(error.message || "Error iniciando sesión.", "error");
   } finally {
     loginBtn.disabled = false;
   }
@@ -139,7 +139,7 @@ async function onLoginSubmit(event) {
 
 async function onLogoutClick() {
   logoutBtn.disabled = true;
-  setSessionMessage("Cerrando sesion...");
+  setSessionMessage("Cerrando sesión...");
 
   try {
     await fetch("/api/reporter/logout", { method: "POST" });
@@ -166,7 +166,7 @@ async function onCreatePost(event) {
   }
 
   if (imageFile.size > MAX_UPLOAD_BYTES) {
-    setPostMessageText(`La imagen supera el limite de ${MAX_UPLOAD_MB}MB.`, "error");
+    setPostMessageText(`La imagen supera el límite de ${MAX_UPLOAD_MB}MB.`, "error");
     return;
   }
 
@@ -285,9 +285,9 @@ function toggleAuthenticatedUI(authenticated) {
   logoutBtn.classList.toggle("hidden", !authenticated);
 
   if (authenticated) {
-    setSessionMessage("Sesion activa: ya puedes publicar noticias.", "ok");
+    setSessionMessage("Sesión activa: ya puedes publicar noticias.", "ok");
   } else {
-    setSessionMessage("Sesion cerrada. Inicia sesion para publicar.", "");
+    setSessionMessage("Sesión cerrada. Inicia sesión para publicar.", "");
   }
 }
 
@@ -315,7 +315,7 @@ async function loadReporterPosts() {
     reporterPostsList.innerHTML = posts
       .map((post) => {
         const postId = String(post?.id || "").trim();
-        const title = escapeHtml(String(post?.title || "Sin titulo"));
+        const title = escapeHtml(String(post?.title || "Sin título"));
         const date = escapeHtml(String(post?.date || "--"));
         const category = escapeHtml(String(post?.category || "General"));
         const openUrl = `/noticia.html?id=${encodeURIComponent(postId)}`;
@@ -341,7 +341,7 @@ async function loadReporterPosts() {
 
 async function deleteReporterPost(postId, button) {
   const approved = window.confirm(
-    "Esta accion eliminara la noticia y, si aplica, su imagen subida. ¿Deseas continuar?"
+    "Esta acción eliminará la noticia y, si aplica, su imagen subida. ¿Deseas continuar?"
   );
   if (!approved) return;
 
