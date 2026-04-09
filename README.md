@@ -39,8 +39,8 @@ Abrir en navegador: [http://localhost:3000](http://localhost:3000)
 ## Flujo
 
 1. El usuario completa el formulario.
-2. El frontend llama `POST /api/generate-visa-pdf`.
-3. El backend valida todos los datos.
+2. El frontend genera un token `reCAPTCHA v3` y llama `POST /api/generate-visa-pdf`.
+3. El backend valida el token anti-bots y todos los datos del formulario.
 4. Se genera el PDF final con letra profesional y marcas `X`.
 5. Se descarga automaticamente el archivo listo para imprimir.
 
@@ -66,7 +66,7 @@ Abrir en navegador: [http://localhost:3000](http://localhost:3000)
 5. La noticia se guarda en `blog-posts.json` del directorio configurado en `BLOG_STORAGE_DIR` (si existe); en local, por defecto, se mantiene en el archivo base del proyecto.
 6. En la seccion `Gestionar publicaciones` puedes eliminar noticias existentes.
 
-## Variables de entorno para reporteros
+## Variables de entorno
 
 - `REPORTER_PASSWORD`: contrasena requerida para iniciar sesion en el area de reporteros.
 - `REPORTER_SESSION_SECRET`: clave para firmar cookies de sesion (en produccion debe tener al menos 32 caracteres).
@@ -74,6 +74,10 @@ Abrir en navegador: [http://localhost:3000](http://localhost:3000)
 - `BLOG_STORAGE_DIR`: ruta persistente para guardar `blog-posts.json` y `uploads/` (recomendado en Render: `/var/data`).
 - `SITE_BASE_URL`: URL publica base del sitio para generar `robots.txt` y `sitemap.xml` con dominio canonico (ejemplo: `https://tu-dominio.com`).
 - `ALLOWED_ORIGINS`: lista separada por comas de origenes autorizados para CORS (ejemplo: `https://tu-dominio.com,https://www.tu-dominio.com`).
+- `RECAPTCHA_SITE_KEY`: clave publica de Google reCAPTCHA v3 (se usa en frontend).
+- `RECAPTCHA_SECRET_KEY`: clave secreta de Google reCAPTCHA v3 (solo backend).
+- `RECAPTCHA_ACTION`: accion esperada para validar el token (por defecto: `generate_visa_pdf`).
+- `RECAPTCHA_MIN_SCORE`: puntaje minimo aceptado entre `0` y `1` (por defecto recomendado: `0.5`).
 
 ## Persistencia en Render (evitar perdida de noticias)
 
@@ -95,6 +99,7 @@ Con esto, los despliegues o reinicios no eliminan noticias ni imagenes subidas d
 
 - Cookies de sesion de reportero con `HttpOnly`, `Secure` (en produccion) y `SameSite=Strict`.
 - Rate limiting en login de reportero, escritura de noticias y generacion de PDF.
+- Validacion obligatoria de `reCAPTCHA v3` para generar PDF (token, accion y score minimo).
 - Validacion de imagen por firma binaria real (no solo por extension o MIME declarado).
 - Headers base de seguridad (`nosniff`, `DENY`, `Referrer-Policy`, `Permissions-Policy`).
 

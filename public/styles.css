@@ -269,9 +269,23 @@ small {
   border-radius: 14px;
   padding: 1rem;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.9rem;
   box-shadow: var(--card-shadow);
+}
+
+.recaptcha-disclaimer {
+  margin: 0;
+  width: 100%;
+  color: #786f62;
+  font-size: 0.82rem;
+  line-height: 1.42;
+}
+
+.recaptcha-disclaimer a {
+  color: var(--primary);
+  font-weight: 700;
 }
 
 .site-footer {

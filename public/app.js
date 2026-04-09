@@ -47,6 +47,9 @@ const dateInputs = [
 ];
 
 const MAX_EMAIL_CHARS = 35;
+const RECAPTCHA_SCRIPT_URL = "https://www.google.com/recaptcha/api.js";
+let recaptchaConfigPromise = null;
+let recaptchaScriptPromise = null;
 
 function setStatus(message, tone = "") {
   statusMessage.textContent = message;
@@ -341,6 +344,102 @@ function populateSelect(select, items) {
   }
 }
 
+async function loadRecaptchaConfig() {
+  if (!recaptchaConfigPromise) {
+    recaptchaConfigPromise = fetch("/api/recaptcha-config", {
+      headers: {
+        Accept: "application/json",
+      },
+    })
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.message || "No se pudo inicializar la protección anti-bots.");
+        }
+
+        const siteKey = String(data.siteKey || "").trim();
+        const action = String(data.action || "generate_visa_pdf").trim() || "generate_visa_pdf";
+
+        if (!siteKey) {
+          throw new Error("No se recibió la clave pública de reCAPTCHA.");
+        }
+
+        return { siteKey, action };
+      })
+      .catch((error) => {
+        recaptchaConfigPromise = null;
+        throw error;
+      });
+  }
+
+  return recaptchaConfigPromise;
+}
+
+async function loadRecaptchaScript(siteKey) {
+  if (window.grecaptcha && typeof window.grecaptcha.ready === "function") {
+    return window.grecaptcha;
+  }
+
+  if (!recaptchaScriptPromise) {
+    recaptchaScriptPromise = new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = `${RECAPTCHA_SCRIPT_URL}?render=${encodeURIComponent(siteKey)}`;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        if (window.grecaptcha && typeof window.grecaptcha.ready === "function") {
+          resolve(window.grecaptcha);
+          return;
+        }
+
+        reject(new Error("reCAPTCHA no se cargó correctamente."));
+      };
+      script.onerror = () => {
+        reject(new Error("No se pudo cargar reCAPTCHA. Revisa tu conexión e inténtalo de nuevo."));
+      };
+      document.head.appendChild(script);
+    }).catch((error) => {
+      recaptchaScriptPromise = null;
+      throw error;
+    });
+  }
+
+  return recaptchaScriptPromise;
+}
+
+async function createRecaptchaToken() {
+  const config = await loadRecaptchaConfig();
+  const grecaptcha = await loadRecaptchaScript(config.siteKey);
+
+  return new Promise((resolve, reject) => {
+    grecaptcha.ready(() => {
+      grecaptcha
+        .execute(config.siteKey, { action: config.action })
+        .then((token) => {
+          const cleanToken = String(token || "").trim();
+          if (!cleanToken) {
+            reject(new Error("No se pudo validar reCAPTCHA."));
+            return;
+          }
+
+          resolve(cleanToken);
+        })
+        .catch(() => {
+          reject(new Error("No se pudo validar reCAPTCHA. Inténtalo nuevamente."));
+        });
+    });
+  });
+}
+
+async function preloadRecaptcha() {
+  try {
+    const config = await loadRecaptchaConfig();
+    await loadRecaptchaScript(config.siteKey);
+  } catch (_error) {
+    // El error se mostrará al usuario cuando intente enviar el formulario.
+  }
+}
+
 async function loadCountries() {
   try {
     const response = await fetch("/api/countries");
@@ -371,7 +470,11 @@ async function submitForm(event) {
 
   try {
     const formData = new FormData(form);
-    const payload = buildPayload(formData);
+    const recaptchaToken = await createRecaptchaToken();
+    const payload = {
+      ...buildPayload(formData),
+      recaptchaToken,
+    };
 
     const response = await fetch("/api/generate-visa-pdf", {
       method: "POST",
@@ -422,3 +525,4 @@ togglePropositoViajeMode();
 toggleLugarFirmaMode();
 updateEmailHint();
 loadCountries();
+preloadRecaptcha();

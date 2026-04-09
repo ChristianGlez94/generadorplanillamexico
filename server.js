@@ -1,6 +1,7 @@
 require('dotenv').config();
 const path = require("path");
 const crypto = require("crypto");
+const https = require("https");
 const fs = require("fs/promises");
 const express = require("express");
 const { countryList } = require("./src/data/countries");
@@ -31,6 +32,11 @@ const REPORTER_JS_PATH = path.join(__dirname, "internal", "reporter", "reportero
 const BLOG_STORAGE_DIR = String(process.env.BLOG_STORAGE_DIR || "").trim();
 const SITE_BASE_URL = String(process.env.SITE_BASE_URL || "").trim();
 const ALLOWED_ORIGINS = parseAllowedOrigins(String(process.env.ALLOWED_ORIGINS || ""), SITE_BASE_URL);
+const RECAPTCHA_SITE_KEY = String(process.env.RECAPTCHA_SITE_KEY || "").trim();
+const RECAPTCHA_SECRET_KEY = String(process.env.RECAPTCHA_SECRET_KEY || "").trim();
+const RECAPTCHA_ACTION = String(process.env.RECAPTCHA_ACTION || "generate_visa_pdf").trim() || "generate_visa_pdf";
+const RECAPTCHA_MIN_SCORE = parseRecaptchaMinScore(process.env.RECAPTCHA_MIN_SCORE);
+const RECAPTCHA_ENABLED = Boolean(RECAPTCHA_SITE_KEY && RECAPTCHA_SECRET_KEY);
 const LEGACY_UPLOADS_DIR = path.join(__dirname, "public", "uploads");
 const UPLOADS_DIR = BLOG_STORAGE_DIR
   ? path.join(path.resolve(BLOG_STORAGE_DIR), "uploads")
@@ -79,6 +85,14 @@ if (!process.env.REPORTER_SESSION_SECRET) {
   console.warn(
     "[reporteros] REPORTER_SESSION_SECRET es débil para producción. Recomendado: 32+ caracteres aleatorios."
   );
+}
+
+if (RECAPTCHA_SITE_KEY && !RECAPTCHA_SECRET_KEY) {
+  console.warn("[security] RECAPTCHA_SITE_KEY configurada, pero RECAPTCHA_SECRET_KEY está ausente.");
+} else if (!RECAPTCHA_SITE_KEY && RECAPTCHA_SECRET_KEY) {
+  console.warn("[security] RECAPTCHA_SECRET_KEY configurada, pero RECAPTCHA_SITE_KEY está ausente.");
+} else if (!RECAPTCHA_ENABLED) {
+  console.warn("[security] reCAPTCHA V3 no está configurado. La generación de PDF será bloqueada.");
 }
 
 app.use((req, res, next) => {
@@ -157,6 +171,124 @@ function normalizePortalPath(rawPath) {
   if (!input) return "/acceso-reporteros-interno";
   if (input.startsWith("/")) return input;
   return `/${input}`;
+}
+
+function parseRecaptchaMinScore(rawValue) {
+  const parsed = Number.parseFloat(String(rawValue || "").trim());
+  if (!Number.isFinite(parsed)) {
+    return 0.5;
+  }
+
+  return Math.min(1, Math.max(0, parsed));
+}
+
+async function postFormUrlEncoded(url, payload) {
+  const target = new URL(url);
+  const body = new URLSearchParams(payload).toString();
+
+  return new Promise((resolve, reject) => {
+    const request = https.request(
+      {
+        protocol: target.protocol,
+        hostname: target.hostname,
+        port: target.port || 443,
+        path: `${target.pathname}${target.search}`,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Content-Length": Buffer.byteLength(body),
+        },
+      },
+      (response) => {
+        const chunks = [];
+        response.on("data", (chunk) => chunks.push(chunk));
+        response.on("end", () => {
+          resolve({
+            statusCode: response.statusCode || 0,
+            body: Buffer.concat(chunks).toString("utf8"),
+          });
+        });
+      }
+    );
+
+    request.on("error", reject);
+    request.write(body);
+    request.end();
+  });
+}
+
+async function verifyRecaptchaV3Token(token, remoteIp) {
+  if (!RECAPTCHA_ENABLED) {
+    return {
+      ok: false,
+      reason: "not_configured",
+    };
+  }
+
+  const cleanToken = String(token || "").trim();
+  if (!cleanToken) {
+    return {
+      ok: false,
+      reason: "missing_token",
+    };
+  }
+
+  const payload = {
+    secret: RECAPTCHA_SECRET_KEY,
+    response: cleanToken,
+  };
+
+  const cleanRemoteIp = String(remoteIp || "").trim();
+  if (cleanRemoteIp && cleanRemoteIp !== "unknown") {
+    payload.remoteip = cleanRemoteIp;
+  }
+
+  try {
+    const verifyResponse = await postFormUrlEncoded(
+      "https://www.google.com/recaptcha/api/siteverify",
+      payload
+    );
+
+    if (verifyResponse.statusCode < 200 || verifyResponse.statusCode >= 300) {
+      return {
+        ok: false,
+        reason: "google_http_error",
+      };
+    }
+
+    let body;
+    try {
+      body = JSON.parse(verifyResponse.body || "{}");
+    } catch (_error) {
+      return {
+        ok: false,
+        reason: "invalid_json",
+      };
+    }
+
+    const action = String(body.action || "");
+    const score = Number(body.score);
+    const scoreIsValid = Number.isFinite(score) && score >= RECAPTCHA_MIN_SCORE;
+    const actionIsValid = action === RECAPTCHA_ACTION;
+    const success = body.success === true;
+
+    return {
+      ok: success && actionIsValid && scoreIsValid,
+      reason: !success
+        ? "captcha_rejected"
+        : !actionIsValid
+          ? "action_mismatch"
+          : !scoreIsValid
+            ? "score_too_low"
+            : "ok",
+      body,
+    };
+  } catch (_error) {
+    return {
+      ok: false,
+      reason: "request_failed",
+    };
+  }
 }
 
 function parseAllowedOrigins(rawOrigins, fallbackBaseUrl) {
@@ -587,6 +719,19 @@ app.get("/api/countries", (_req, res) => {
   });
 });
 
+app.get("/api/recaptcha-config", (_req, res) => {
+  if (!RECAPTCHA_SITE_KEY) {
+    return res.status(503).json({
+      message: "reCAPTCHA no está configurado en el servidor.",
+    });
+  }
+
+  return res.json({
+    siteKey: RECAPTCHA_SITE_KEY,
+    action: RECAPTCHA_ACTION,
+  });
+});
+
 app.get("/robots.txt", (req, res) => {
   const baseUrl = resolveBaseUrl(req);
   const lines = [
@@ -897,7 +1042,42 @@ app.delete(
 });
 
 app.post("/api/generate-visa-pdf", withRateLimit("visa-pdf", RATE_LIMIT_CONFIG.generatePdf), async (req, res) => {
-  const parsed = visaFormSchema.safeParse(req.body);
+  if (!RECAPTCHA_ENABLED) {
+    return res.status(503).json({
+      message: "Protección anti-bots no disponible temporalmente. Inténtalo más tarde.",
+    });
+  }
+
+  const rawBody = req.body && typeof req.body === "object" ? req.body : {};
+  const recaptchaToken = String(rawBody.recaptchaToken || "").trim();
+  const recaptchaCheck = await verifyRecaptchaV3Token(recaptchaToken, getClientIp(req));
+
+  if (!recaptchaCheck.ok) {
+    const recaptchaErrors = Array.isArray(recaptchaCheck.body?.["error-codes"])
+      ? recaptchaCheck.body["error-codes"].join(",")
+      : "none";
+    console.warn(
+      `[security] Solicitud bloqueada por reCAPTCHA. reason=${recaptchaCheck.reason} action=${String(recaptchaCheck.body?.action || "n/a")} score=${String(recaptchaCheck.body?.score || "n/a")} errors=${recaptchaErrors}`
+    );
+    let statusCode = 403;
+    let message = "No se pudo validar la solicitud. Inténtalo de nuevo.";
+
+    if (recaptchaCheck.reason === "missing_token") {
+      statusCode = 400;
+      message = "No se recibió validación anti-bots. Recarga la página e inténtalo nuevamente.";
+    }
+
+    if (["request_failed", "google_http_error", "invalid_json"].includes(recaptchaCheck.reason)) {
+      statusCode = 503;
+      message = "No se pudo validar protección anti-bots temporalmente. Inténtalo en unos minutos.";
+    }
+
+    return res.status(statusCode).json({ message });
+  }
+
+  const formPayload = { ...rawBody };
+  delete formPayload.recaptchaToken;
+  const parsed = visaFormSchema.safeParse(formPayload);
 
   if (!parsed.success) {
     return res.status(400).json({
