@@ -236,6 +236,13 @@ if (
     const detailUrl = `/noticia.html?id=${encodeURIComponent(post.id)}`;
     const imageLoading = isFeatured ? "eager" : "lazy";
     const fetchPriority = isFeatured ? "high" : "low";
+    const imageMarkup = buildPostImageMarkup({
+      image: post.image,
+      alt: post.alt,
+      isFeatured,
+      imageLoading,
+      fetchPriority,
+    });
 
     return `
       <article
@@ -247,13 +254,7 @@ if (
       >
         <figure class="blog-media">
           <a href="${detailUrl}" class="blog-image-link">
-            <img
-              src="${escapeHtml(post.image)}"
-              alt="${escapeHtml(post.alt)}"
-              loading="${imageLoading}"
-              decoding="async"
-              fetchpriority="${fetchPriority}"
-            />
+            ${imageMarkup}
           </a>
         </figure>
         <div>
@@ -269,6 +270,86 @@ if (
         </div>
       </article>
     `;
+  }
+
+  function buildPostImageMarkup({ image, alt, isFeatured, imageLoading, fetchPriority }) {
+    const cleanImage = String(image || "").trim();
+    const safeAlt = escapeHtml(String(alt || "Imagen de la noticia"));
+
+    if (!cleanImage) {
+      return '<div class="blog-image-fallback" aria-hidden="true"></div>';
+    }
+
+    const optimized = buildOptimizedImageSources(cleanImage, isFeatured);
+    if (!optimized) {
+      return `
+        <img
+          src="${escapeHtml(cleanImage)}"
+          alt="${safeAlt}"
+          loading="${imageLoading}"
+          decoding="async"
+          fetchpriority="${fetchPriority}"
+        />
+      `;
+    }
+
+    return `
+      <picture>
+        <source
+          type="image/webp"
+          srcset="${escapeHtml(optimized.webpSrcSet)}"
+          sizes="${escapeHtml(optimized.sizes)}"
+        />
+        <img
+          src="${escapeHtml(optimized.fallbackSrc)}"
+          srcset="${escapeHtml(optimized.fallbackSrcSet)}"
+          sizes="${escapeHtml(optimized.sizes)}"
+          alt="${safeAlt}"
+          loading="${imageLoading}"
+          decoding="async"
+          fetchpriority="${fetchPriority}"
+        />
+      </picture>
+    `;
+  }
+
+  function buildOptimizedImageSources(imageUrl, isFeatured) {
+    if (!isOptimizableUploadImage(imageUrl)) return null;
+
+    const widths = isFeatured ? [480, 768, 1024, 1360] : [280, 420, 640];
+    const quality = isFeatured ? 80 : 74;
+    const sizes = isFeatured
+      ? "(max-width: 900px) 92vw, 58vw"
+      : "(max-width: 900px) 92vw, (max-width: 1120px) 44vw, 30vw";
+    const webpSrcSet = widths
+      .map((width) => `${buildOptimizedImageUrl(imageUrl, width, quality, "webp")} ${String(width)}w`)
+      .join(", ");
+    const fallbackSrcSet = widths
+      .map((width) => `${buildOptimizedImageUrl(imageUrl, width, quality, "jpeg")} ${String(width)}w`)
+      .join(", ");
+    const fallbackWidth = widths[Math.max(0, widths.length - 2)] || widths[0];
+
+    return {
+      webpSrcSet,
+      fallbackSrcSet,
+      fallbackSrc: buildOptimizedImageUrl(imageUrl, fallbackWidth, quality, "jpeg"),
+      sizes,
+    };
+  }
+
+  function buildOptimizedImageUrl(sourceUrl, width, quality, format) {
+    const params = new URLSearchParams();
+    params.set("src", sourceUrl);
+    params.set("w", String(width));
+    params.set("q", String(quality));
+    params.set("fm", format);
+    return `/api/blog-image?${params.toString()}`;
+  }
+
+  function isOptimizableUploadImage(imageUrl) {
+    const clean = String(imageUrl || "").trim();
+    if (!clean.startsWith("/uploads/")) return false;
+    return !/\.(svg|gif)(\?.*)?$/i.test(clean);
   }
 }
 

@@ -4,6 +4,14 @@ const crypto = require("crypto");
 const https = require("https");
 const fs = require("fs/promises");
 const express = require("express");
+let sharp = null;
+try {
+  sharp = require("sharp");
+} catch (_error) {
+  console.warn(
+    "[images] sharp no está disponible; se usará la ruta original sin optimización de imágenes."
+  );
+}
 const { countryList } = require("./src/data/countries");
 const { visaFormSchema } = require("./src/validation/visaSchema");
 const { blogPostCreateSchema } = require("./src/validation/blogSchema");
@@ -41,13 +49,23 @@ const LEGACY_UPLOADS_DIR = path.join(__dirname, "public", "uploads");
 const UPLOADS_DIR = BLOG_STORAGE_DIR
   ? path.join(path.resolve(BLOG_STORAGE_DIR), "uploads")
   : LEGACY_UPLOADS_DIR;
+const IMAGE_VARIANTS_DIR = BLOG_STORAGE_DIR
+  ? path.join(path.resolve(BLOG_STORAGE_DIR), "image-variants")
+  : path.join(__dirname, "output", "image-variants");
 const MAX_IMAGE_UPLOAD_BYTES = 4 * 1024 * 1024;
+const MAX_UPLOAD_IMAGE_WIDTH = 1920;
+const MAX_OPTIMIZED_IMAGE_WIDTH = 1920;
+const DEFAULT_OPTIMIZED_IMAGE_QUALITY = 76;
 const useSecureCookie = process.env.NODE_ENV === "production";
 const IMAGE_EXT_BY_MIME = {
   "image/jpeg": "jpg",
   "image/png": "png",
   "image/webp": "webp",
   "image/gif": "gif",
+};
+const OPTIMIZED_IMAGE_MIME_BY_FORMAT = {
+  webp: "image/webp",
+  jpeg: "image/jpeg",
 };
 const PUBLIC_SITE_PATHS = [
   "/",
@@ -133,17 +151,16 @@ app.use((req, res, next) => {
 
   return next();
 });
-app.use((_req, res, next) => {
-  // Evita servir una version antigua del formulario o JS por cache del navegador.
-  res.setHeader("Cache-Control", "no-store");
-  next();
-});
 app.use(express.json({ limit: "10mb" }));
-app.use("/uploads", express.static(UPLOADS_DIR));
+app.use("/uploads", express.static(UPLOADS_DIR, { maxAge: "365d", immutable: true }));
 if (path.resolve(UPLOADS_DIR) !== path.resolve(LEGACY_UPLOADS_DIR)) {
-  app.use("/uploads", express.static(LEGACY_UPLOADS_DIR));
+  app.use("/uploads", express.static(LEGACY_UPLOADS_DIR, { maxAge: "365d", immutable: true }));
 }
-app.use(express.static(path.join(__dirname, "public")));
+app.use(
+  express.static(path.join(__dirname, "public"), {
+    setHeaders: setPublicStaticCacheHeaders,
+  })
+);
 
 async function ensureUploadsDir() {
   try {
@@ -154,6 +171,33 @@ async function ensureUploadsDir() {
 }
 
 void ensureUploadsDir();
+
+async function ensureImageVariantsDir() {
+  try {
+    await fs.mkdir(IMAGE_VARIANTS_DIR, { recursive: true });
+  } catch (error) {
+    console.error("No se pudo preparar el directorio de variantes de imágenes:", error);
+  }
+}
+
+void ensureImageVariantsDir();
+
+function setPublicStaticCacheHeaders(res, filePath) {
+  const extension = path.extname(filePath).toLowerCase();
+
+  if (extension === ".html") {
+    // HTML se mantiene sin cache para que siempre referencie los assets más recientes.
+    res.setHeader("Cache-Control", "no-store");
+    return;
+  }
+
+  if (extension === ".js" || extension === ".css") {
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    return;
+  }
+
+  res.setHeader("Cache-Control", "public, max-age=2592000");
+}
 
 function safeCompareText(a, b) {
   const left = Buffer.from(String(a || ""), "utf8");
@@ -619,6 +663,195 @@ function resolveUploadedImagePath(imageUrl) {
   return path.join(UPLOADS_DIR, safeName);
 }
 
+function resolveUploadedImageCandidatePaths(imageUrl) {
+  const primaryPath = resolveUploadedImagePath(imageUrl);
+  if (!primaryPath) return [];
+
+  if (path.resolve(UPLOADS_DIR) === path.resolve(LEGACY_UPLOADS_DIR)) {
+    return [primaryPath];
+  }
+
+  const legacyPath = path.join(LEGACY_UPLOADS_DIR, path.basename(primaryPath));
+  return [primaryPath, legacyPath];
+}
+
+async function findExistingUploadedImage(imageUrl) {
+  const candidates = resolveUploadedImageCandidatePaths(imageUrl);
+  for (const candidate of candidates) {
+    try {
+      const stats = await fs.stat(candidate);
+      if (stats.isFile()) {
+        return {
+          filePath: candidate,
+          stats,
+        };
+      }
+    } catch (error) {
+      if (!error || error.code !== "ENOENT") {
+        throw error;
+      }
+    }
+  }
+
+  return null;
+}
+
+function sanitizeImageCachePart(value) {
+  const clean = String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64);
+  return clean || "img";
+}
+
+function normalizeOptimizedImageFormat(value) {
+  const raw = String(getSingleQueryValue(value) || "").trim().toLowerCase();
+  const normalized = raw === "jpg" ? "jpeg" : raw;
+  if (normalized === "jpeg") return "jpeg";
+  return "webp";
+}
+
+function normalizeOptimizedImageQuality(value) {
+  const parsed = parsePositiveInteger(value, DEFAULT_OPTIMIZED_IMAGE_QUALITY, 90);
+  return Math.max(45, parsed);
+}
+
+async function optimizeUploadedImageBuffer(inputBuffer, sourceMime) {
+  if (!sharp) {
+    return {
+      buffer: inputBuffer,
+      mimeType: sourceMime,
+    };
+  }
+
+  const isConvertible = sourceMime === "image/jpeg" || sourceMime === "image/png" || sourceMime === "image/webp";
+  if (!isConvertible) {
+    return {
+      buffer: inputBuffer,
+      mimeType: sourceMime,
+    };
+  }
+
+  const pipeline = sharp(inputBuffer, { failOn: "none", animated: false })
+    .rotate()
+    .resize({
+      width: MAX_UPLOAD_IMAGE_WIDTH,
+      fit: "inside",
+      withoutEnlargement: true,
+    });
+
+  const optimizedBuffer = await pipeline.webp({ quality: 80, effort: 5 }).toBuffer();
+  const shouldKeepOriginal =
+    !optimizedBuffer.length ||
+    (sourceMime !== "image/png" && optimizedBuffer.length >= Math.round(inputBuffer.length * 0.98));
+
+  if (shouldKeepOriginal) {
+    return {
+      buffer: inputBuffer,
+      mimeType: sourceMime,
+    };
+  }
+
+  return {
+    buffer: optimizedBuffer,
+    mimeType: "image/webp",
+  };
+}
+
+function buildOptimizedImageVariantFileName(sourcePath, sourceStats, width, quality, format) {
+  const sourceBaseName = sanitizeImageCachePart(path.basename(sourcePath, path.extname(sourcePath)));
+  const sourceFingerprint = crypto
+    .createHash("sha1")
+    .update(`${sourcePath}|${String(sourceStats.size)}|${String(sourceStats.mtimeMs)}`)
+    .digest("hex")
+    .slice(0, 12);
+  const formatExtension = format === "jpeg" ? "jpg" : "webp";
+  return `${sourceBaseName}--${sourceFingerprint}--w${String(width)}-q${String(quality)}.${formatExtension}`;
+}
+
+async function createOptimizedImageVariant({ sourcePath, sourceStats, width, quality, format }) {
+  await fs.mkdir(IMAGE_VARIANTS_DIR, { recursive: true });
+  const safeWidth = Math.max(160, Math.min(width, MAX_OPTIMIZED_IMAGE_WIDTH));
+  const fileName = buildOptimizedImageVariantFileName(sourcePath, sourceStats, safeWidth, quality, format);
+  const variantPath = path.join(IMAGE_VARIANTS_DIR, fileName);
+
+  try {
+    await fs.stat(variantPath);
+    return {
+      filePath: variantPath,
+      contentType: OPTIMIZED_IMAGE_MIME_BY_FORMAT[format] || "image/webp",
+    };
+  } catch (error) {
+    if (!error || error.code !== "ENOENT") {
+      throw error;
+    }
+  }
+
+  const tempPath = `${variantPath}.tmp-${process.pid}-${Date.now()}`;
+  let transformer = sharp(sourcePath, { failOn: "none", animated: false })
+    .rotate()
+    .resize({
+      width: safeWidth,
+      fit: "inside",
+      withoutEnlargement: true,
+    });
+
+  if (format === "jpeg") {
+    transformer = transformer.jpeg({ quality, mozjpeg: true, progressive: true });
+  } else {
+    transformer = transformer.webp({ quality, effort: 5 });
+  }
+
+  try {
+    await transformer.toFile(tempPath);
+    await fs.rename(tempPath, variantPath);
+  } catch (error) {
+    try {
+      await fs.unlink(tempPath);
+    } catch (_unlinkError) {
+      // Ignoramos errores de limpieza temporal.
+    }
+    throw error;
+  }
+
+  return {
+    filePath: variantPath,
+    contentType: OPTIMIZED_IMAGE_MIME_BY_FORMAT[format] || "image/webp",
+  };
+}
+
+async function purgeImageVariantsForUpload(imageUrl) {
+  const sourcePath = resolveUploadedImagePath(imageUrl);
+  if (!sourcePath) return;
+
+  const sourceBaseName = sanitizeImageCachePart(path.basename(sourcePath, path.extname(sourcePath)));
+  const prefix = `${sourceBaseName}--`;
+  let entries = [];
+
+  try {
+    entries = await fs.readdir(IMAGE_VARIANTS_DIR, { withFileTypes: true });
+  } catch (error) {
+    if (error && error.code === "ENOENT") return;
+    throw error;
+  }
+
+  await Promise.all(
+    entries
+      .filter((entry) => entry.isFile() && entry.name.startsWith(prefix))
+      .map(async (entry) => {
+        const targetPath = path.join(IMAGE_VARIANTS_DIR, entry.name);
+        try {
+          await fs.unlink(targetPath);
+        } catch (error) {
+          if (error && error.code !== "ENOENT") {
+            console.error("Error eliminando variante optimizada:", error);
+          }
+        }
+      })
+  );
+}
+
 function createReporterToken() {
   const expiresAt = Date.now() + REPORTER_SESSION_TTL_SECONDS * 1000;
   const payload = String(expiresAt);
@@ -844,6 +1077,63 @@ app.get("/api/blog-posts/:id", async (req, res) => {
   }
 });
 
+app.get("/api/blog-image", async (req, res) => {
+  const sourceUrl = String(getSingleQueryValue(req.query.src) || "").trim();
+  if (!sourceUrl) {
+    return res.status(400).json({
+      message: "Debes indicar la imagen en el parámetro src.",
+    });
+  }
+
+  const sourcePath = resolveUploadedImagePath(sourceUrl);
+  if (!sourcePath) {
+    return res.status(400).json({
+      message: "Solo se permiten imágenes internas de /uploads/.",
+    });
+  }
+
+  const requestedWidth = parsePositiveInteger(req.query.w, 960, MAX_OPTIMIZED_IMAGE_WIDTH);
+  const requestedQuality = normalizeOptimizedImageQuality(req.query.q);
+  const requestedFormat = normalizeOptimizedImageFormat(req.query.fm);
+  try {
+    const sourceFile = await findExistingUploadedImage(sourceUrl);
+    if (!sourceFile) {
+      return res.status(404).json({
+        message: "No se encontró la imagen solicitada.",
+      });
+    }
+    const sourceExtension = path.extname(sourceFile.filePath).toLowerCase();
+
+    if (!sharp || sourceExtension === ".svg" || sourceExtension === ".gif") {
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      return res.sendFile(sourceFile.filePath);
+    }
+
+    const variant = await createOptimizedImageVariant({
+      sourcePath: sourceFile.filePath,
+      sourceStats: sourceFile.stats,
+      width: requestedWidth,
+      quality: requestedQuality,
+      format: requestedFormat,
+    });
+
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    res.type(variant.contentType);
+    return res.sendFile(variant.filePath);
+  } catch (error) {
+    if (error && error.code === "ENOENT") {
+      return res.status(404).json({
+        message: "No se encontró la imagen solicitada.",
+      });
+    }
+
+    console.error("Error optimizando imagen del blog:", error);
+    return res.status(500).json({
+      message: "No se pudo procesar la imagen solicitada.",
+    });
+  }
+});
+
 app.get("/reporteros.html", (_req, res) => {
   return res.status(404).send("No disponible.");
 });
@@ -956,13 +1246,24 @@ app.post(
   try {
     await fs.mkdir(UPLOADS_DIR, { recursive: true });
 
-    const extension = IMAGE_EXT_BY_MIME[detectedMime];
+    let optimizedUpload = {
+      buffer: imageBuffer,
+      mimeType: detectedMime,
+    };
+    try {
+      optimizedUpload = await optimizeUploadedImageBuffer(imageBuffer, detectedMime);
+    } catch (error) {
+      console.warn("No se pudo optimizar la imagen subida; se guardará el archivo original.", error);
+    }
+
+    const finalMime = IMAGE_EXT_BY_MIME[optimizedUpload.mimeType] ? optimizedUpload.mimeType : detectedMime;
+    const extension = IMAGE_EXT_BY_MIME[finalMime];
     const baseName = sanitizeUploadBaseName(fileName);
     const unique = crypto.randomBytes(5).toString("hex");
     const finalName = `${Date.now()}-${unique}-${baseName}.${extension}`;
     const absolutePath = path.join(UPLOADS_DIR, finalName);
 
-    await fs.writeFile(absolutePath, imageBuffer);
+    await fs.writeFile(absolutePath, optimizedUpload.buffer);
 
     return res.status(201).json({
       ok: true,
@@ -1018,14 +1319,22 @@ app.delete(
       });
     }
 
-    const uploadedImagePath = resolveUploadedImagePath(removed.image);
-    if (uploadedImagePath) {
-      try {
-        await fs.unlink(uploadedImagePath);
-      } catch (error) {
-        if (error && error.code !== "ENOENT") {
-          console.error("Error eliminando imagen de noticia:", error);
+    const uploadedImagePaths = resolveUploadedImageCandidatePaths(removed.image);
+    if (uploadedImagePaths.length) {
+      for (const uploadedImagePath of uploadedImagePaths) {
+        try {
+          await fs.unlink(uploadedImagePath);
+        } catch (error) {
+          if (error && error.code !== "ENOENT") {
+            console.error("Error eliminando imagen de noticia:", error);
+          }
         }
+      }
+
+      try {
+        await purgeImageVariantsForUpload(removed.image);
+      } catch (error) {
+        console.error("Error eliminando variantes optimizadas:", error);
       }
     }
 

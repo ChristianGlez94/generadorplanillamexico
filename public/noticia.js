@@ -78,7 +78,7 @@ function renderPost(post) {
     </div>
     <h2>${escapeHtml(post.title)}</h2>
     <figure class="blog-detail-image">
-      <img src="${escapeHtml(post.image)}" alt="${escapeHtml(post.alt)}" loading="eager" />
+      ${buildDetailImageMarkup(post.image, post.alt)}
     </figure>
     <p class="blog-detail-summary">${escapeHtml(post.description)}</p>
     <div class="blog-detail-content">
@@ -86,6 +86,75 @@ function renderPost(post) {
     </div>
     <div class="blog-tags">${tags}</div>
   `;
+}
+
+function buildDetailImageMarkup(imageUrl, altText) {
+  const cleanImage = String(imageUrl || "").trim();
+  const safeAlt = escapeHtml(String(altText || "Imagen de la noticia"));
+
+  if (!cleanImage) {
+    return '<div class="blog-image-fallback" aria-hidden="true"></div>';
+  }
+
+  const optimized = buildOptimizedImageSources(cleanImage);
+  if (!optimized) {
+    return `<img src="${escapeHtml(cleanImage)}" alt="${safeAlt}" loading="eager" fetchpriority="high" decoding="async" />`;
+  }
+
+  return `
+    <picture>
+      <source
+        type="image/webp"
+        srcset="${escapeHtml(optimized.webpSrcSet)}"
+        sizes="${escapeHtml(optimized.sizes)}"
+      />
+      <img
+        src="${escapeHtml(optimized.fallbackSrc)}"
+        srcset="${escapeHtml(optimized.fallbackSrcSet)}"
+        sizes="${escapeHtml(optimized.sizes)}"
+        alt="${safeAlt}"
+        loading="eager"
+        fetchpriority="high"
+        decoding="async"
+      />
+    </picture>
+  `;
+}
+
+function buildOptimizedImageSources(imageUrl) {
+  if (!isOptimizableUploadImage(imageUrl)) return null;
+
+  const widths = [720, 1024, 1360, 1680];
+  const quality = 80;
+  const sizes = "(max-width: 900px) 92vw, 78vw";
+  const webpSrcSet = widths
+    .map((width) => `${buildOptimizedImageUrl(imageUrl, width, quality, "webp")} ${String(width)}w`)
+    .join(", ");
+  const fallbackSrcSet = widths
+    .map((width) => `${buildOptimizedImageUrl(imageUrl, width, quality, "jpeg")} ${String(width)}w`)
+    .join(", ");
+
+  return {
+    webpSrcSet,
+    fallbackSrcSet,
+    fallbackSrc: buildOptimizedImageUrl(imageUrl, widths[1], quality, "jpeg"),
+    sizes,
+  };
+}
+
+function buildOptimizedImageUrl(sourceUrl, width, quality, format) {
+  const params = new URLSearchParams();
+  params.set("src", sourceUrl);
+  params.set("w", String(width));
+  params.set("q", String(quality));
+  params.set("fm", format);
+  return `/api/blog-image?${params.toString()}`;
+}
+
+function isOptimizableUploadImage(imageUrl) {
+  const clean = String(imageUrl || "").trim();
+  if (!clean.startsWith("/uploads/")) return false;
+  return !/\.(svg|gif)(\?.*)?$/i.test(clean);
 }
 
 function linkifyText(value) {
