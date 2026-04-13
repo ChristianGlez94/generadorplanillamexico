@@ -95,6 +95,9 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 0.6rem 0.55rem;
+  justify-content: center;
+  width: 100%;
+  margin-inline: auto;
 }
 
 .hero-nav a {
@@ -119,6 +122,40 @@ body {
   background: #fff4e0;
   color: #6d1323;
   border-color: rgba(255, 255, 255, 0.78);
+}
+
+.hero-store {
+  margin: 1rem auto 0;
+  display: grid;
+  gap: 0.35rem;
+  justify-items: center;
+  text-align: center;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.hero-store-label {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: rgba(253, 248, 241, 0.96);
+}
+
+.hero-store-link {
+  display: inline-flex;
+  border-radius: 11px;
+  transition: transform 140ms ease, filter 140ms ease;
+}
+
+.hero-store-link:hover {
+  filter: brightness(1.04);
+  transform: translateY(-1px);
+}
+
+.hero-store-badge {
+  display: block;
+  width: min(245px, 100%);
+  height: auto;
 }
 
 .eyebrow {
@@ -295,6 +332,7 @@ small {
   border-radius: 14px;
   padding: 1rem 1rem 1.1rem;
   box-shadow: var(--card-shadow);
+  text-align: center;
 }
 
 .site-footer p {
@@ -312,6 +350,7 @@ small {
   flex-wrap: wrap;
   gap: 0.58rem 0.78rem;
   margin-bottom: 0.65rem;
+  justify-content: center;
 }
 
 .footer-links a {
@@ -950,6 +989,10 @@ article[data-detail-url]:focus-visible {
     width: min(320px, 100%);
   }
 
+  .hero-store-badge {
+    width: min(230px, 82vw);
+  }
+
   .actions {
     flex-direction: column;
     align-items: stretch;
@@ -958,6 +1001,7 @@ article[data-detail-url]:focus-visible {
   .footer-links {
     flex-direction: column;
     gap: 0.5rem;
+    align-items: center;
   }
 
   .blog-featured-item {
