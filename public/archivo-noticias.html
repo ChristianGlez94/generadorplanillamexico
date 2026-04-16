@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Blog y noticias de interés</title>
+    <title>Archivo completo de noticias | Planilla Visa México</title>
     <link rel="icon" type="image/x-icon" href="/favicon_planilla_mexico_v2.ico" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -23,14 +23,14 @@
 
     <main class="layout">
       <header class="hero">
-        <p class="eyebrow">Contenido informativo</p>
-        <h1>Blog con temas de actualidad sobre migración mexicana</h1>
+        <p class="eyebrow">Archivo editorial</p>
+        <h1>Archivo completo de noticias</h1>
         <p>
-          Aquí puedes encontrar novedades importantes, recordatorios de requisitos y guías útiles
-          para solicitantes.
+          Accede a todas las publicaciones organizadas por fecha para consultar noticias anteriores.
         </p>
         <nav class="hero-nav" aria-label="Navegación principal del sitio">
           <a href="/">Blog</a>
+          <a href="/archivo-noticias.html">Archivo</a>
           <a href="/herramienta.html">Herramienta</a>
           <a href="/sobre-esta-herramienta.html">Sobre esta herramienta</a>
           <a href="/contacto.html">Contacto</a>
@@ -41,61 +41,28 @@
       </header>
 
       <section class="card blog-toolbar">
-        <h2>Busca por palabra o tema</h2>
-        <label class="blog-search-wrap" for="blogSearch">
-          Buscar noticia
-          <input
-            type="search"
-            id="blogSearch"
-            placeholder="Ejemplo: pasaporte, cita, documentos"
-            autocomplete="off"
-          />
-        </label>
+        <h2>Resumen del archivo</h2>
         <div class="blog-meta" aria-live="polite">
-          <p id="blogCount">0 noticias</p>
-          <p id="blogLastUpdate">Última actualización: --</p>
-        </div>
-        <div id="blogCategories" class="blog-categories" aria-label="Filtrar por categoría"></div>
-      </section>
-
-      <section class="card blog-random">
-        <h2>Idea novedosa: descubrimiento rápido</h2>
-        <p>
-          Pulsa el botón y te sugerimos una noticia aleatoria de la lista activa para consultar en
-          menos de 30 segundos.
-        </p>
-        <div class="blog-random-actions">
-          <button type="button" id="blogRandomBtn">Mostrar noticia aleatoria</button>
-          <p id="blogRandomResult">Aún no se ha elegido ninguna noticia.</p>
+          <p id="archiveCount">0 noticias publicadas</p>
+          <p id="archiveLastUpdate">Última actualización: --</p>
         </div>
       </section>
 
-      <section class="card blog-featured-wrap">
-        <h2>Noticia destacada</h2>
-        <article id="featuredPost" class="blog-featured" aria-live="polite"></article>
+      <section class="card blog-archive-wrap">
+        <h2>Todas las noticias del sitio</h2>
+        <ul id="blogArchive" class="blog-archive-list" aria-live="polite">
+          <li class="blog-empty">Cargando archivo de noticias...</li>
+        </ul>
       </section>
 
       <section class="card">
-        <h2>Todas las noticias</h2>
-        <div id="blogList" class="blog-list" aria-live="polite"></div>
-        <div id="blogPagination" class="blog-pagination hidden" aria-label="Navegación por páginas">
-          <button type="button" id="blogPrevBtn" class="blog-page-btn">Página anterior</button>
-          <p id="blogPageInfo">Página 1 de 1</p>
-          <button type="button" id="blogNextBtn" class="blog-page-btn">Página siguiente</button>
-        </div>
-        <nav id="blogPaginationLinks" class="blog-pagination-links hidden" aria-label="Enlaces de paginación">
-          <span id="blogPrevLink" class="blog-page-link is-disabled">Sin página anterior</span>
-          <span id="blogNextLink" class="blog-page-link is-disabled">Sin página siguiente</span>
-        </nav>
+        <h2>Volver al blog principal</h2>
+        <p>
+          Para ver noticias destacadas, filtros y paginación interactiva, regresa al blog principal.
+        </p>
+        <a class="blog-cta" href="/">Ir al blog principal</a>
       </section>
 
-      <section class="card blog-archive-shortcut">
-        <h2>Archivo de noticias</h2>
-        <p>
-          Si quieres revisar publicaciones antiguas en un solo lugar, consulta el archivo completo.
-        </p>
-        <a class="blog-cta" href="/archivo-noticias.html">Ver archivo completo de noticias</a>
-      </section>
       <footer class="site-footer">
         <p class="footer-note">
           Herramienta informativa y de apoyo. Verifica requisitos y actualizaciones en fuentes
@@ -120,6 +87,7 @@
         </div>
         <div class="footer-links">
           <a href="/">Blog</a>
+          <a href="/archivo-noticias.html">Archivo</a>
           <a href="/herramienta.html">Herramienta</a>
           <a href="/sobre-esta-herramienta.html">Sobre esta herramienta</a>
           <a href="/contacto.html">Contacto</a>
@@ -131,8 +99,6 @@
         <p class="footer-copy">&copy; 2026 Generador Planilla México. Todos los derechos reservados.</p>
       </footer>
     </main>
-
-    <script src="/blog.js?v=20260416_archivepage" defer></script>
     <script src="/site-shell.js?v=20260407_1030" defer></script>
   </body>
 </html>

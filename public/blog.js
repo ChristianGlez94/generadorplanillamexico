@@ -10,6 +10,7 @@ const blogPagination = document.getElementById("blogPagination");
 const blogPageInfo = document.getElementById("blogPageInfo");
 const blogPrevBtn = document.getElementById("blogPrevBtn");
 const blogNextBtn = document.getElementById("blogNextBtn");
+const blogPaginationLinks = document.getElementById("blogPaginationLinks");
 
 if (
   blogSearch &&
@@ -29,7 +30,7 @@ if (
     posts: [],
     query: "",
     category: "Todas",
-    page: 1,
+    page: readInitialPageFromUrl(),
     pageSize: 15,
     totalItems: 0,
     totalPages: 1,
@@ -85,7 +86,7 @@ if (
     }
 
     const randomPost = state.posts[Math.floor(Math.random() * state.posts.length)];
-    const url = `/noticia.html?id=${encodeURIComponent(randomPost.id)}`;
+    const url = buildPostDetailUrl(randomPost.id);
     blogRandomResult.innerHTML = `Sugerencia: <a href="${url}">${escapeHtml(randomPost.title)}</a>`;
   });
 
@@ -135,6 +136,7 @@ if (
       state.hasPrevPage = data.pagination.hasPrevPage;
       state.hasNextPage = data.pagination.hasNextPage;
       state.availableCategories = data.availableCategories;
+      updatePageQueryParam(state.page);
 
       renderCategoryButtons();
       renderStats();
@@ -229,12 +231,23 @@ if (
   function renderPagination() {
     const shouldShow = state.totalItems > 0 && state.totalPages > 1;
     blogPagination.classList.toggle("hidden", !shouldShow);
+    if (blogPaginationLinks) {
+      blogPaginationLinks.classList.toggle("hidden", !shouldShow);
+    }
 
     const loadingText = state.loading ? " (cargando...)" : "";
     blogPageInfo.textContent = `Página ${state.page} de ${state.totalPages}${loadingText}`;
 
     blogPrevBtn.disabled = state.loading || !state.hasPrevPage;
     blogNextBtn.disabled = state.loading || !state.hasNextPage;
+
+    if (blogPaginationLinks) {
+      blogPaginationLinks.innerHTML = buildCrawlerPaginationLinks({
+        page: state.page,
+        hasPrevPage: state.hasPrevPage,
+        hasNextPage: state.hasNextPage,
+      });
+    }
   }
 
   function buildPostMarkup(post, isFeatured) {
@@ -245,7 +258,7 @@ if (
       .map((tag) => `<span class="blog-tag">${escapeHtml(tag)}</span>`)
       .join("");
     const wrapperClass = isFeatured ? "blog-featured-item" : "blog-card";
-    const detailUrl = `/noticia.html?id=${encodeURIComponent(post.id)}`;
+    const detailUrl = buildPostDetailUrl(post.id);
     const imageLoading = isFeatured ? "eager" : "lazy";
     const fetchPriority = isFeatured ? "high" : "low";
     const imageMarkup = buildPostImageMarkup({
@@ -471,6 +484,55 @@ function normalizePost(post, index) {
     content,
     tags: Array.isArray(post?.tags) ? post.tags.map((tag) => String(tag)) : [],
   };
+}
+
+function buildPostDetailUrl(postId) {
+  const cleanId = String(postId || "").trim();
+  if (!cleanId) return "/noticia.html";
+  return `/noticia.html?id=${encodeURIComponent(cleanId)}`;
+}
+
+function readInitialPageFromUrl() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const rawPage = String(params.get("page") || "").trim();
+    const parsed = Number.parseInt(rawPage, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) return 1;
+    return parsed;
+  } catch (_error) {
+    return 1;
+  }
+}
+
+function buildPageHref(page) {
+  const safePage = Math.max(1, Number(page) || 1);
+  const params = new URLSearchParams(window.location.search);
+  if (safePage <= 1) {
+    params.delete("page");
+  } else {
+    params.set("page", String(safePage));
+  }
+  const query = params.toString();
+  return `${window.location.pathname}${query ? `?${query}` : ""}`;
+}
+
+function updatePageQueryParam(page) {
+  const nextHref = buildPageHref(page);
+  const currentHref = `${window.location.pathname}${window.location.search}`;
+  if (nextHref === currentHref) return;
+  window.history.replaceState({}, "", nextHref);
+}
+
+function buildCrawlerPaginationLinks({ page, hasPrevPage, hasNextPage }) {
+  const safePage = Math.max(1, Number(page) || 1);
+  const prevMarkup = hasPrevPage
+    ? `<a class="blog-page-link" href="${escapeHtml(buildPageHref(safePage - 1))}" rel="prev">Ir a la página anterior</a>`
+    : '<span class="blog-page-link is-disabled">Sin página anterior</span>';
+  const nextMarkup = hasNextPage
+    ? `<a class="blog-page-link" href="${escapeHtml(buildPageHref(safePage + 1))}" rel="next">Ir a la página siguiente</a>`
+    : '<span class="blog-page-link is-disabled">Sin página siguiente</span>';
+
+  return `${prevMarkup}${nextMarkup}`;
 }
 
 function parseDate(value) {

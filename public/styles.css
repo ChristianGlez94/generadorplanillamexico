@@ -707,6 +707,14 @@ button:disabled {
   gap: 0.7rem;
 }
 
+.blog-pagination-links {
+  margin-top: 0.65rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.8rem;
+  justify-content: center;
+}
+
 #blogPageInfo {
   margin: 0;
   color: var(--muted);
@@ -732,6 +740,63 @@ button:disabled {
 .blog-page-btn:not(:disabled):hover {
   border-color: var(--primary);
   color: var(--primary);
+}
+
+.blog-page-link {
+  display: inline-flex;
+  align-items: center;
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+
+.blog-page-link:hover {
+  border-bottom-color: rgba(10, 108, 87, 0.4);
+}
+
+.blog-page-link.is-disabled {
+  color: #8c8376;
+  cursor: default;
+}
+
+.blog-archive-wrap {
+  margin-top: 1rem;
+}
+
+.blog-archive-wrap p {
+  margin: 0;
+}
+
+.blog-archive-shortcut {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.blog-archive-shortcut p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.blog-archive-list {
+  margin: 0.65rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.blog-archive-item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.65rem;
+  align-items: baseline;
+}
+
+.blog-archive-date {
+  color: #7a6d60;
+  font-size: 0.86rem;
 }
 
 .blog-card h3 {
@@ -1040,6 +1105,10 @@ article[data-detail-url]:focus-visible {
   .blog-pagination {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .blog-pagination-links {
+    justify-content: flex-start;
   }
 
   .related-news-list {

@@ -38,6 +38,7 @@ const REPORTER_PORTAL_PATH = normalizePortalPath(
 const REPORTER_HTML_PATH = path.join(__dirname, "internal", "reporter", "reporteros.html");
 const REPORTER_JS_PATH = path.join(__dirname, "internal", "reporter", "reporteros.js");
 const BLOG_HTML_TEMPLATE_PATH = path.join(__dirname, "public", "blog.html");
+const BLOG_ARCHIVE_TEMPLATE_PATH = path.join(__dirname, "public", "archivo-noticias.html");
 const NEWS_HTML_TEMPLATE_PATH = path.join(__dirname, "public", "noticia.html");
 const BLOG_STORAGE_DIR = String(process.env.BLOG_STORAGE_DIR || "").trim();
 const SITE_BASE_URL = String(process.env.SITE_BASE_URL || "").trim();
@@ -74,7 +75,7 @@ const OPTIMIZED_IMAGE_MIME_BY_FORMAT = {
 const PUBLIC_SITE_PATHS = [
   "/",
   "/herramienta.html",
-  "/blog.html",
+  "/archivo-noticias.html",
   "/sobre-esta-herramienta.html",
   "/contacto.html",
   "/politica-privacidad.html",
@@ -161,9 +162,11 @@ app.use(express.json({ limit: "10mb" }));
 app.get("/", async (req, res) => {
   try {
     const posts = await listBlogPosts();
+    const requestedPage = parsePositiveInteger(getSingleQueryValue(req.query.page), 1);
     const html = await renderBlogListHtml({
       baseUrl: resolveBaseUrl(req),
       posts,
+      requestedPage,
       canonicalPath: "/",
       pageTitle: "Blog y noticias de interés | Planilla Visa México",
       seoDescription:
@@ -179,22 +182,24 @@ app.get("/", async (req, res) => {
 });
 
 app.get("/blog.html", async (req, res) => {
+  const queryStart = String(req.originalUrl || "").indexOf("?");
+  const queryString = queryStart >= 0 ? String(req.originalUrl || "").slice(queryStart) : "";
+  return res.redirect(301, `/${queryString}`);
+});
+
+app.get("/archivo-noticias.html", async (req, res) => {
   try {
     const posts = await listBlogPosts();
-    const html = await renderBlogListHtml({
+    const html = await renderBlogArchivePageHtml({
       baseUrl: resolveBaseUrl(req),
       posts,
-      canonicalPath: "/",
-      pageTitle: "Blog y noticias de interés | Planilla Visa México",
-      seoDescription:
-        "Noticias y guías útiles sobre trámites de visa y viaje a México, con enfoque en información práctica y verificable.",
     });
 
     res.setHeader("Cache-Control", "no-store");
     return res.type("text/html; charset=utf-8").send(html);
   } catch (error) {
-    console.error("Error renderizando /blog.html:", error);
-    return res.status(500).type("text/plain; charset=utf-8").send("No se pudo cargar el blog.");
+    console.error("Error renderizando /archivo-noticias.html:", error);
+    return res.status(500).type("text/plain; charset=utf-8").send("No se pudo cargar el archivo de noticias.");
   }
 });
 
@@ -633,7 +638,8 @@ async function readTemplateFileCached(filePath) {
 async function renderBlogListHtml({
   baseUrl,
   posts,
-  canonicalPath = "/blog.html",
+  requestedPage = 1,
+  canonicalPath = "/",
   pageTitle = "Blog y noticias de interés | Planilla Visa México",
   seoDescription = "",
 }) {
@@ -641,8 +647,9 @@ async function renderBlogListHtml({
   const safePosts = Array.isArray(posts) ? posts : [];
   const totalItems = safePosts.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / BLOG_PAGE_SIZE));
-  const currentPage = 1;
-  const pagePosts = safePosts.slice(0, BLOG_PAGE_SIZE);
+  const currentPage = Math.min(Math.max(1, Number(requestedPage) || 1), totalPages);
+  const offset = (currentPage - 1) * BLOG_PAGE_SIZE;
+  const pagePosts = safePosts.slice(offset, offset + BLOG_PAGE_SIZE);
   const featured = pagePosts[0] || null;
   const listItems = pagePosts.slice(1);
   const categories = collectBlogCategories(safePosts);
@@ -663,16 +670,23 @@ async function renderBlogListHtml({
       ? '<p class="blog-empty">No hay más noticias en esta página.</p>'
       : '<p class="blog-empty">No hay noticias publicadas por ahora.</p>';
   const randomMarkup = featured
-    ? `Sugerencia inicial: <a href="/noticia.html?id=${encodeURIComponent(featured.id)}">${escapeHtml(featured.title)}</a>`
+    ? `Sugerencia inicial: <a href="${buildBlogPostUrl(featured.id)}">${escapeHtml(featured.title)}</a>`
     : "Aún no hay noticias disponibles.";
   const paginationMarkup = buildBlogPaginationMarkup({
     page: currentPage,
     totalPages,
     totalItems,
-    hasPrevPage: false,
+    hasPrevPage: currentPage > 1,
     hasNextPage: currentPage < totalPages,
+    basePath: canonicalPath,
   });
-  const canonicalUrl = makeAbsoluteUrl(baseUrl, canonicalPath);
+  const canonicalUrl = makeAbsoluteUrl(baseUrl, buildBlogPageHref(canonicalPath, currentPage));
+  const prevUrl = currentPage > 1
+    ? makeAbsoluteUrl(baseUrl, buildBlogPageHref(canonicalPath, currentPage - 1))
+    : "";
+  const nextUrl = currentPage < totalPages
+    ? makeAbsoluteUrl(baseUrl, buildBlogPageHref(canonicalPath, currentPage + 1))
+    : "";
   const resolvedDescription = seoDescription
     || (totalItems
       ? `Noticias y guías sobre trámites de visa y viaje a México. Actualmente hay ${totalItems} publicaciones con información práctica y fuentes oficiales.`
@@ -684,7 +698,11 @@ async function renderBlogListHtml({
     `<meta property="og:title" content="${escapeHtml(pageTitle)}" />`,
     `<meta property="og:description" content="${escapeHtml(resolvedDescription)}" />`,
     `<meta property="og:url" content="${escapeHtml(canonicalUrl)}" />`,
-  ].join("\n    ");
+    prevUrl ? `<link rel="prev" href="${escapeHtml(prevUrl)}" />` : "",
+    nextUrl ? `<link rel="next" href="${escapeHtml(nextUrl)}" />` : "",
+  ]
+    .filter(Boolean)
+    .join("\n    ");
 
   let html = template;
   html = html.replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(pageTitle)}</title>`);
@@ -709,9 +727,60 @@ async function renderBlogListHtml({
     /<div id="blogList" class="blog-list" aria-live="polite">[\s\S]*?<\/div>/,
     `<div id="blogList" class="blog-list" aria-live="polite">${listMarkup}</div>`
   );
+  const paginationWithLinksPattern =
+    /<div id="blogPagination" class="blog-pagination(?: hidden)?" aria-label="Navegación por páginas">[\s\S]*?<\/div>\s*<nav id="blogPaginationLinks" class="blog-pagination-links(?: hidden)?" aria-label="Enlaces de paginación">[\s\S]*?<\/nav>/;
+  const paginationOnlyPattern =
+    /<div id="blogPagination" class="blog-pagination(?: hidden)?" aria-label="Navegación por páginas">[\s\S]*?<\/div>/;
+
+  if (paginationWithLinksPattern.test(html)) {
+    html = html.replace(paginationWithLinksPattern, paginationMarkup);
+  } else {
+    html = html.replace(paginationOnlyPattern, paginationMarkup);
+  }
+  html = html.replace("</head>", `    ${headExtras}\n  </head>`);
+
+  return html;
+}
+
+async function renderBlogArchivePageHtml({ baseUrl, posts }) {
+  const template = await readTemplateFileCached(BLOG_ARCHIVE_TEMPLATE_PATH);
+  const safePosts = Array.isArray(posts) ? posts : [];
+  const totalItems = safePosts.length;
+  const latestPost = safePosts[0] || null;
+  const countText = totalItems === 1 ? "1 noticia publicada" : `${totalItems} noticias publicadas`;
+  const lastUpdateText = latestPost
+    ? `Última actualización: ${formatBlogDate(latestPost.date)}`
+    : "Última actualización: --";
+  const archiveMarkup = buildBlogArchiveMarkup(safePosts, { maxItems: 5000 });
+  const canonicalUrl = makeAbsoluteUrl(baseUrl, "/archivo-noticias.html");
+  const seoDescription = totalItems
+    ? `Archivo completo con ${totalItems} noticias y artículos sobre migración mexicana, visas y trámites para viajar a México.`
+    : "Archivo completo de noticias sobre migración mexicana, visas y trámites para viajar a México.";
+  const headExtras = [
+    `<meta name="description" content="${escapeHtml(seoDescription)}" />`,
+    `<link rel="canonical" href="${escapeHtml(canonicalUrl)}" />`,
+    '<meta property="og:type" content="website" />',
+    `<meta property="og:title" content="${escapeHtml("Archivo completo de noticias | Planilla Visa México")}" />`,
+    `<meta property="og:description" content="${escapeHtml(seoDescription)}" />`,
+    `<meta property="og:url" content="${escapeHtml(canonicalUrl)}" />`,
+  ].join("\n    ");
+
+  let html = template;
   html = html.replace(
-    /<div id="blogPagination" class="blog-pagination(?: hidden)?" aria-label="Navegación por páginas">[\s\S]*?<\/div>/,
-    paginationMarkup
+    /<p id="archiveCount">[\s\S]*?<\/p>/,
+    `<p id="archiveCount">${escapeHtml(countText)}</p>`
+  );
+  html = html.replace(
+    /<p id="archiveLastUpdate">[\s\S]*?<\/p>/,
+    `<p id="archiveLastUpdate">${escapeHtml(lastUpdateText)}</p>`
+  );
+  html = html.replace(
+    /<ul id="blogArchive" class="blog-archive-list" aria-live="polite">[\s\S]*?<\/ul>/,
+    `<ul id="blogArchive" class="blog-archive-list" aria-live="polite">${archiveMarkup}</ul>`
+  );
+  html = html.replace(
+    /<title>[\s\S]*?<\/title>/,
+    "<title>Archivo completo de noticias | Planilla Visa México</title>"
   );
   html = html.replace("</head>", `    ${headExtras}\n  </head>`);
 
@@ -735,7 +804,7 @@ async function renderBlogDetailHtml({ baseUrl, post, posts, requestedPostId }) {
     : safePosts.slice(0, 3);
   const relatedMarkup = buildBlogRelatedMarkup(relatedItems);
   const canonicalUrl = hasPost
-    ? makeAbsoluteUrl(baseUrl, `/noticia.html?id=${encodeURIComponent(post.id)}`)
+    ? makeAbsoluteUrl(baseUrl, buildBlogPostUrl(post.id))
     : makeAbsoluteUrl(baseUrl, "/");
   const pageTitle = hasPost ? `${String(post.title || "Noticia")} | Blog` : "Noticia no disponible | Blog";
   const seoDescription = hasPost
@@ -823,13 +892,22 @@ function buildBlogCategoryButtonsMarkup(categories, activeCategory = "Todas") {
     .join("");
 }
 
-function buildBlogPaginationMarkup({ page, totalPages, totalItems, hasPrevPage, hasNextPage }) {
+function buildBlogPaginationMarkup({ page, totalPages, totalItems, hasPrevPage, hasNextPage, basePath = "/" }) {
   const shouldShow = totalItems > 0 && totalPages > 1;
   const wrapperClass = shouldShow ? "blog-pagination" : "blog-pagination hidden";
   const prevDisabled = hasPrevPage ? "" : " disabled";
   const nextDisabled = hasNextPage ? "" : " disabled";
   const safePage = Math.max(1, Number(page) || 1);
   const safeTotalPages = Math.max(1, Number(totalPages) || 1);
+  const prevHref = buildBlogPageHref(basePath, safePage - 1);
+  const nextHref = buildBlogPageHref(basePath, safePage + 1);
+  const crawlerLinksClass = shouldShow ? "blog-pagination-links" : "blog-pagination-links hidden";
+  const prevCrawlerLink = hasPrevPage
+    ? `<a id="blogPrevLink" class="blog-page-link" href="${escapeHtml(prevHref)}" rel="prev">Ir a la página anterior</a>`
+    : '<span id="blogPrevLink" class="blog-page-link is-disabled">Sin página anterior</span>';
+  const nextCrawlerLink = hasNextPage
+    ? `<a id="blogNextLink" class="blog-page-link" href="${escapeHtml(nextHref)}" rel="next">Ir a la página siguiente</a>`
+    : '<span id="blogNextLink" class="blog-page-link is-disabled">Sin página siguiente</span>';
 
   return `
         <div id="blogPagination" class="${wrapperClass}" aria-label="Navegación por páginas">
@@ -837,6 +915,10 @@ function buildBlogPaginationMarkup({ page, totalPages, totalItems, hasPrevPage, 
           <p id="blogPageInfo">Página ${safePage} de ${safeTotalPages}</p>
           <button type="button" id="blogNextBtn" class="blog-page-btn"${nextDisabled}>Página siguiente</button>
         </div>
+        <nav id="blogPaginationLinks" class="${crawlerLinksClass}" aria-label="Enlaces de paginación">
+          ${prevCrawlerLink}
+          ${nextCrawlerLink}
+        </nav>
   `.trim();
 }
 
@@ -853,7 +935,7 @@ function buildBlogPostCardMarkup(post, isFeatured) {
         .join("")
     : "";
   const wrapperClass = isFeatured ? "blog-featured-item" : "blog-card";
-  const detailUrl = `/noticia.html?id=${encodeURIComponent(String(safePost.id || ""))}`;
+  const detailUrl = buildBlogPostUrl(safePost.id);
   const imageMarkup = buildBlogImageMarkup({
     image: safePost.image,
     alt: safePost.alt,
@@ -928,7 +1010,7 @@ function buildBlogRelatedMarkup(posts) {
 
   return safePosts
     .map((post) => {
-      const detailUrl = `/noticia.html?id=${encodeURIComponent(String(post?.id || ""))}`;
+      const detailUrl = buildBlogPostUrl(post?.id);
       return `
         <article class="related-news-card">
           <h3><a class="blog-title-link" href="${detailUrl}">${escapeHtml(post?.title || "Noticia")}</a></h3>
@@ -938,6 +1020,51 @@ function buildBlogRelatedMarkup(posts) {
       `;
     })
     .join("");
+}
+
+function buildBlogArchiveMarkup(posts, options = {}) {
+  const safePosts = Array.isArray(posts) ? posts : [];
+  const maxItems = Math.max(1, Number(options.maxItems) || 250);
+  if (!safePosts.length) {
+    return '<li class="blog-empty">No hay noticias disponibles en el archivo por ahora.</li>';
+  }
+
+  const visiblePosts = safePosts.slice(0, maxItems);
+  const rows = visiblePosts.map((post) => {
+    const detailUrl = buildBlogPostUrl(post?.id);
+    const title = escapeHtml(post?.title || "Noticia");
+    const date = escapeHtml(formatBlogDate(post?.date));
+    return `
+      <li class="blog-archive-item">
+        <a class="blog-title-link" href="${detailUrl}">${title}</a>
+        <span class="blog-archive-date">${date}</span>
+      </li>
+    `;
+  });
+
+  if (safePosts.length > visiblePosts.length) {
+    rows.push(`
+      <li class="blog-archive-item">
+        <a class="blog-open-link" href="/sitemap.xml">Ver más URLs en el sitemap</a>
+      </li>
+    `);
+  }
+
+  return rows.join("");
+}
+
+function buildBlogPostUrl(postId) {
+  const cleanId = String(postId || "").trim();
+  if (!cleanId) return "/noticia.html";
+  return `/noticia.html?id=${encodeURIComponent(cleanId)}`;
+}
+
+function buildBlogPageHref(basePath, page) {
+  const safeBasePath = String(basePath || "/").trim() || "/";
+  const cleanBase = safeBasePath.startsWith("/") ? safeBasePath : `/${safeBasePath}`;
+  const safePage = Math.max(1, Number(page) || 1);
+  if (safePage <= 1) return cleanBase;
+  return `${cleanBase}?page=${String(safePage)}`;
 }
 
 function buildBlogImageMarkup({ image, alt, mode }) {
@@ -1632,7 +1759,13 @@ app.get("/sitemap.xml", async (req, res) => {
     const posts = await listBlogPosts();
 
     const staticEntries = PUBLIC_SITE_PATHS.map((pathname) => {
-      const priority = pathname === "/" ? "1.0" : pathname === "/herramienta.html" ? "0.9" : pathname === "/blog.html" ? "0.8" : "0.7";
+      const priority = pathname === "/"
+        ? "1.0"
+        : pathname === "/herramienta.html"
+          ? "0.9"
+          : pathname === "/archivo-noticias.html"
+            ? "0.8"
+            : "0.7";
       const changefreq = pathname === "/" || pathname === "/herramienta.html" ? "daily" : "weekly";
 
       return {
@@ -1644,14 +1777,25 @@ app.get("/sitemap.xml", async (req, res) => {
     });
 
     const postEntries = posts.map((post) => ({
-      loc: makeAbsoluteUrl(baseUrl, `/noticia.html?id=${encodeURIComponent(post.id)}`),
+      loc: makeAbsoluteUrl(baseUrl, buildBlogPostUrl(post.id)),
       lastmod: toIsoTimestamp(post.createdAt || post.date),
       changefreq: "weekly",
       priority: "0.8",
     }));
 
+    const totalBlogPages = Math.max(1, Math.ceil(posts.length / BLOG_PAGE_SIZE));
+    const paginatedBlogEntries = [];
+    for (let page = 2; page <= totalBlogPages; page += 1) {
+      paginatedBlogEntries.push({
+        loc: makeAbsoluteUrl(baseUrl, buildBlogPageHref("/", page)),
+        lastmod: nowIso,
+        changefreq: "daily",
+        priority: "0.75",
+      });
+    }
+
     res.type("application/xml; charset=utf-8");
-    return res.send(buildSitemapXml([...staticEntries, ...postEntries]));
+    return res.send(buildSitemapXml([...staticEntries, ...paginatedBlogEntries, ...postEntries]));
   } catch (error) {
     console.error("Error generando sitemap.xml:", error);
     return res.status(500).type("application/xml; charset=utf-8").send(
