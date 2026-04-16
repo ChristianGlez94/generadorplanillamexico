@@ -64,6 +64,7 @@ function renderPost(post) {
   const paragraphs = Array.isArray(post.content) && post.content.length
     ? post.content
     : [post.description];
+  const reading = estimateReadingTime(paragraphs, post.description);
 
   const tags = post.tags
     .map((tag) => `<span class="blog-tag">${escapeHtml(tag)}</span>`)
@@ -75,6 +76,8 @@ function renderPost(post) {
     <div class="blog-detail-meta">
       <span class="blog-chip">${escapeHtml(post.category)}</span>
       <span class="blog-date">${escapeHtml(formatDate(post.date))}</span>
+      <span class="blog-reading">${reading} min de lectura</span>
+      <span class="blog-date">Autor: Equipo editorial</span>
     </div>
     <h2>${escapeHtml(post.title)}</h2>
     <figure class="blog-detail-image">
@@ -269,6 +272,15 @@ function normalizePost(post) {
     content: Array.isArray(post?.content) ? post.content.map((line) => String(line)) : [],
     tags: Array.isArray(post?.tags) ? post.tags.map((tag) => String(tag)) : [],
   };
+}
+
+function estimateReadingTime(content, description) {
+  const contentText = Array.isArray(content) && content.length ? content.join(" ") : description;
+  const words = String(contentText || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
+  return Math.max(1, Math.round(words / 170));
 }
 
 function parseDate(value) {

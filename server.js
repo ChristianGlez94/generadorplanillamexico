@@ -37,6 +37,8 @@ const REPORTER_PORTAL_PATH = normalizePortalPath(
 );
 const REPORTER_HTML_PATH = path.join(__dirname, "internal", "reporter", "reporteros.html");
 const REPORTER_JS_PATH = path.join(__dirname, "internal", "reporter", "reporteros.js");
+const BLOG_HTML_TEMPLATE_PATH = path.join(__dirname, "public", "blog.html");
+const NEWS_HTML_TEMPLATE_PATH = path.join(__dirname, "public", "noticia.html");
 const BLOG_STORAGE_DIR = String(process.env.BLOG_STORAGE_DIR || "").trim();
 const SITE_BASE_URL = String(process.env.SITE_BASE_URL || "").trim();
 const ALLOWED_ORIGINS = parseAllowedOrigins(String(process.env.ALLOWED_ORIGINS || ""), SITE_BASE_URL);
@@ -56,6 +58,8 @@ const MAX_IMAGE_UPLOAD_BYTES = 4 * 1024 * 1024;
 const MAX_UPLOAD_IMAGE_WIDTH = 1920;
 const MAX_OPTIMIZED_IMAGE_WIDTH = 1920;
 const DEFAULT_OPTIMIZED_IMAGE_QUALITY = 76;
+const BLOG_PAGE_SIZE = 15;
+const BLOG_TEMPLATE_CACHE = new Map();
 const useSecureCookie = process.env.NODE_ENV === "production";
 const IMAGE_EXT_BY_MIME = {
   "image/jpeg": "jpg",
@@ -69,6 +73,7 @@ const OPTIMIZED_IMAGE_MIME_BY_FORMAT = {
 };
 const PUBLIC_SITE_PATHS = [
   "/",
+  "/herramienta.html",
   "/blog.html",
   "/sobre-esta-herramienta.html",
   "/contacto.html",
@@ -152,6 +157,79 @@ app.use((req, res, next) => {
   return next();
 });
 app.use(express.json({ limit: "10mb" }));
+
+app.get("/", async (req, res) => {
+  try {
+    const posts = await listBlogPosts();
+    const html = await renderBlogListHtml({
+      baseUrl: resolveBaseUrl(req),
+      posts,
+      canonicalPath: "/",
+      pageTitle: "Blog y noticias de interés | Planilla Visa México",
+      seoDescription:
+        "Noticias y guías útiles sobre trámites de visa y viaje a México, con enfoque en información práctica y verificable.",
+    });
+
+    res.setHeader("Cache-Control", "no-store");
+    return res.type("text/html; charset=utf-8").send(html);
+  } catch (error) {
+    console.error("Error renderizando /:", error);
+    return res.status(500).type("text/plain; charset=utf-8").send("No se pudo cargar la portada.");
+  }
+});
+
+app.get("/blog.html", async (req, res) => {
+  try {
+    const posts = await listBlogPosts();
+    const html = await renderBlogListHtml({
+      baseUrl: resolveBaseUrl(req),
+      posts,
+      canonicalPath: "/",
+      pageTitle: "Blog y noticias de interés | Planilla Visa México",
+      seoDescription:
+        "Noticias y guías útiles sobre trámites de visa y viaje a México, con enfoque en información práctica y verificable.",
+    });
+
+    res.setHeader("Cache-Control", "no-store");
+    return res.type("text/html; charset=utf-8").send(html);
+  } catch (error) {
+    console.error("Error renderizando /blog.html:", error);
+    return res.status(500).type("text/plain; charset=utf-8").send("No se pudo cargar el blog.");
+  }
+});
+
+app.get("/noticia.html", async (req, res) => {
+  try {
+    const postId = String(getSingleQueryValue(req.query.id) || "").trim();
+    const posts = await listBlogPosts();
+    const selectedPost = postId ? await getBlogPostById(postId) : null;
+    const html = await renderBlogDetailHtml({
+      baseUrl: resolveBaseUrl(req),
+      post: selectedPost,
+      posts,
+      requestedPostId: postId,
+    });
+
+    res.setHeader("Cache-Control", "no-store");
+    if (postId && !selectedPost) {
+      return res.status(404).type("text/html; charset=utf-8").send(html);
+    }
+
+    return res.type("text/html; charset=utf-8").send(html);
+  } catch (error) {
+    console.error("Error renderizando /noticia.html:", error);
+    return res.status(500).type("text/plain; charset=utf-8").send("No se pudo cargar la noticia.");
+  }
+});
+
+app.get("/herramienta.html", (_req, res) => {
+  return res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+app.get("/index.html", (_req, res) => {
+  return res.redirect(301, "/herramienta.html");
+});
+
 app.use("/uploads", express.static(UPLOADS_DIR, { maxAge: "365d", immutable: true }));
 if (path.resolve(UPLOADS_DIR) !== path.resolve(LEGACY_UPLOADS_DIR)) {
   app.use("/uploads", express.static(LEGACY_UPLOADS_DIR, { maxAge: "365d", immutable: true }));
@@ -541,6 +619,573 @@ function buildSitemapXml(entries) {
     "</urlset>",
     "",
   ].join("\n");
+}
+
+async function readTemplateFileCached(filePath) {
+  const cached = BLOG_TEMPLATE_CACHE.get(filePath);
+  if (cached) return cached;
+
+  const template = await fs.readFile(filePath, "utf8");
+  BLOG_TEMPLATE_CACHE.set(filePath, template);
+  return template;
+}
+
+async function renderBlogListHtml({
+  baseUrl,
+  posts,
+  canonicalPath = "/blog.html",
+  pageTitle = "Blog y noticias de interés | Planilla Visa México",
+  seoDescription = "",
+}) {
+  const template = await readTemplateFileCached(BLOG_HTML_TEMPLATE_PATH);
+  const safePosts = Array.isArray(posts) ? posts : [];
+  const totalItems = safePosts.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / BLOG_PAGE_SIZE));
+  const currentPage = 1;
+  const pagePosts = safePosts.slice(0, BLOG_PAGE_SIZE);
+  const featured = pagePosts[0] || null;
+  const listItems = pagePosts.slice(1);
+  const categories = collectBlogCategories(safePosts);
+  const firstVisible = totalItems ? (currentPage - 1) * BLOG_PAGE_SIZE + 1 : 0;
+  const lastVisible = totalItems ? firstVisible + pagePosts.length - 1 : 0;
+  const countText = !totalItems
+    ? "0 noticias"
+    : `Mostrando ${firstVisible}-${Math.max(firstVisible, lastVisible)} de ${totalItems} ${totalItems === 1 ? "noticia" : "noticias"}`;
+  const lastUpdateText = featured
+    ? `Última actualización: ${formatBlogDate(featured.date)}`
+    : "Última actualización: --";
+  const featuredMarkup = featured
+    ? buildBlogPostCardMarkup(featured, true)
+    : '<p class="blog-empty">No hay noticias para mostrar.</p>';
+  const listMarkup = listItems.length
+    ? listItems.map((post) => buildBlogPostCardMarkup(post, false)).join("")
+    : totalItems
+      ? '<p class="blog-empty">No hay más noticias en esta página.</p>'
+      : '<p class="blog-empty">No hay noticias publicadas por ahora.</p>';
+  const randomMarkup = featured
+    ? `Sugerencia inicial: <a href="/noticia.html?id=${encodeURIComponent(featured.id)}">${escapeHtml(featured.title)}</a>`
+    : "Aún no hay noticias disponibles.";
+  const paginationMarkup = buildBlogPaginationMarkup({
+    page: currentPage,
+    totalPages,
+    totalItems,
+    hasPrevPage: false,
+    hasNextPage: currentPage < totalPages,
+  });
+  const canonicalUrl = makeAbsoluteUrl(baseUrl, canonicalPath);
+  const resolvedDescription = seoDescription
+    || (totalItems
+      ? `Noticias y guías sobre trámites de visa y viaje a México. Actualmente hay ${totalItems} publicaciones con información práctica y fuentes oficiales.`
+      : "Noticias y guías sobre trámites de visa y viaje a México con enfoque en información práctica y verificable.");
+  const headExtras = [
+    `<meta name="description" content="${escapeHtml(resolvedDescription)}" />`,
+    `<link rel="canonical" href="${escapeHtml(canonicalUrl)}" />`,
+    '<meta property="og:type" content="website" />',
+    `<meta property="og:title" content="${escapeHtml(pageTitle)}" />`,
+    `<meta property="og:description" content="${escapeHtml(resolvedDescription)}" />`,
+    `<meta property="og:url" content="${escapeHtml(canonicalUrl)}" />`,
+  ].join("\n    ");
+
+  let html = template;
+  html = html.replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(pageTitle)}</title>`);
+  html = html.replace(/<p id="blogCount">[\s\S]*?<\/p>/, `<p id="blogCount">${escapeHtml(countText)}</p>`);
+  html = html.replace(
+    /<p id="blogLastUpdate">[\s\S]*?<\/p>/,
+    `<p id="blogLastUpdate">${escapeHtml(lastUpdateText)}</p>`
+  );
+  html = html.replace(
+    /<div id="blogCategories" class="blog-categories" aria-label="Filtrar por categoría">[\s\S]*?<\/div>/,
+    `<div id="blogCategories" class="blog-categories" aria-label="Filtrar por categoría">${buildBlogCategoryButtonsMarkup(categories, "Todas")}</div>`
+  );
+  html = html.replace(
+    /<p id="blogRandomResult">[\s\S]*?<\/p>/,
+    `<p id="blogRandomResult">${randomMarkup}</p>`
+  );
+  html = html.replace(
+    /<article id="featuredPost" class="blog-featured" aria-live="polite">[\s\S]*?<\/article>/,
+    `<article id="featuredPost" class="blog-featured" aria-live="polite">${featuredMarkup}</article>`
+  );
+  html = html.replace(
+    /<div id="blogList" class="blog-list" aria-live="polite">[\s\S]*?<\/div>/,
+    `<div id="blogList" class="blog-list" aria-live="polite">${listMarkup}</div>`
+  );
+  html = html.replace(
+    /<div id="blogPagination" class="blog-pagination(?: hidden)?" aria-label="Navegación por páginas">[\s\S]*?<\/div>/,
+    paginationMarkup
+  );
+  html = html.replace("</head>", `    ${headExtras}\n  </head>`);
+
+  return html;
+}
+
+async function renderBlogDetailHtml({ baseUrl, post, posts, requestedPostId }) {
+  const template = await readTemplateFileCached(NEWS_HTML_TEMPLATE_PATH);
+  const safePosts = Array.isArray(posts) ? posts : [];
+  const hasPost = Boolean(post);
+  const readingTime = hasPost ? estimateBlogReadingTime(post.content, post.description) : 1;
+  const detailMarkup = hasPost
+    ? buildBlogDetailPostMarkup(post, readingTime)
+    : `<p class="blog-empty">${escapeHtml(
+        requestedPostId
+          ? "La noticia solicitada no está disponible o fue retirada."
+          : "No se especificó la noticia a consultar."
+      )}</p>`;
+  const relatedItems = hasPost
+    ? safePosts.filter((item) => item.id !== post.id).slice(0, 3)
+    : safePosts.slice(0, 3);
+  const relatedMarkup = buildBlogRelatedMarkup(relatedItems);
+  const canonicalUrl = hasPost
+    ? makeAbsoluteUrl(baseUrl, `/noticia.html?id=${encodeURIComponent(post.id)}`)
+    : makeAbsoluteUrl(baseUrl, "/");
+  const pageTitle = hasPost ? `${String(post.title || "Noticia")} | Blog` : "Noticia no disponible | Blog";
+  const seoDescription = hasPost
+    ? truncateText(post.description || post.title || "", 165)
+    : "La noticia solicitada no está disponible. Revisa otras publicaciones recientes del blog.";
+  const robotsMeta = hasPost ? "" : '<meta name="robots" content="noindex,follow" />';
+  const jsonLd = hasPost
+    ? `<script type="application/ld+json">${JSON.stringify(
+        buildNewsArticleJsonLd({
+          baseUrl,
+          canonicalUrl,
+          post,
+          readingTime,
+        })
+      )}</script>`
+    : "";
+  const headExtras = [
+    `<meta name="description" content="${escapeHtml(seoDescription)}" />`,
+    `<link rel="canonical" href="${escapeHtml(canonicalUrl)}" />`,
+    '<meta property="og:type" content="article" />',
+    `<meta property="og:title" content="${escapeHtml(pageTitle)}" />`,
+    `<meta property="og:description" content="${escapeHtml(seoDescription)}" />`,
+    `<meta property="og:url" content="${escapeHtml(canonicalUrl)}" />`,
+    robotsMeta,
+    jsonLd,
+  ]
+    .filter(Boolean)
+    .join("\n    ");
+
+  let html = template;
+  html = html.replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(pageTitle)}</title>`);
+  html = html.replace(
+    /<article id="newsDetail" class="blog-detail-card" aria-live="polite">[\s\S]*?<\/article>/,
+    `<article id="newsDetail" class="blog-detail-card" aria-live="polite">${detailMarkup}</article>`
+  );
+  html = html.replace(
+    /<div id="relatedNews" class="related-news-list" aria-live="polite">[\s\S]*?<\/div>/,
+    `<div id="relatedNews" class="related-news-list" aria-live="polite">${relatedMarkup}</div>`
+  );
+  html = html.replace("</head>", `    ${headExtras}\n  </head>`);
+
+  return html;
+}
+
+function buildNewsArticleJsonLd({ baseUrl, canonicalUrl, post, readingTime }) {
+  const imageUrl = toAbsoluteAssetUrl(baseUrl, post?.image);
+  const datePublished = toIsoTimestamp(post?.createdAt || post?.date);
+  const dateModified = toIsoTimestamp(post?.date || post?.createdAt);
+
+  const payload = {
+    "@context": "https://schema.org",
+    "@type": "NewsArticle",
+    headline: String(post?.title || "Noticia"),
+    description: String(post?.description || ""),
+    datePublished,
+    dateModified,
+    author: {
+      "@type": "Organization",
+      name: "Equipo editorial de Planilla Visa México",
+    },
+    publisher: {
+      "@type": "Organization",
+      name: "Planilla Visa México",
+    },
+    mainEntityOfPage: canonicalUrl,
+    timeRequired: `PT${Math.max(1, Number(readingTime) || 1)}M`,
+  };
+
+  if (imageUrl) {
+    payload.image = [imageUrl];
+  }
+
+  return payload;
+}
+
+function buildBlogCategoryButtonsMarkup(categories, activeCategory = "Todas") {
+  const source = Array.isArray(categories) ? categories : [];
+  const values = ["Todas", ...source];
+  return values
+    .map((category) => {
+      const isActive = category === activeCategory;
+      const activeClass = isActive ? " active" : "";
+      return `<button type="button" class="blog-category-btn${activeClass}" data-category="${escapeHtml(category)}">${escapeHtml(category)}</button>`;
+    })
+    .join("");
+}
+
+function buildBlogPaginationMarkup({ page, totalPages, totalItems, hasPrevPage, hasNextPage }) {
+  const shouldShow = totalItems > 0 && totalPages > 1;
+  const wrapperClass = shouldShow ? "blog-pagination" : "blog-pagination hidden";
+  const prevDisabled = hasPrevPage ? "" : " disabled";
+  const nextDisabled = hasNextPage ? "" : " disabled";
+  const safePage = Math.max(1, Number(page) || 1);
+  const safeTotalPages = Math.max(1, Number(totalPages) || 1);
+
+  return `
+        <div id="blogPagination" class="${wrapperClass}" aria-label="Navegación por páginas">
+          <button type="button" id="blogPrevBtn" class="blog-page-btn"${prevDisabled}>Página anterior</button>
+          <p id="blogPageInfo">Página ${safePage} de ${safeTotalPages}</p>
+          <button type="button" id="blogNextBtn" class="blog-page-btn"${nextDisabled}>Página siguiente</button>
+        </div>
+  `.trim();
+}
+
+function buildBlogPostCardMarkup(post, isFeatured) {
+  const safePost = post || {};
+  const reading = estimateBlogReadingTime(safePost.content, safePost.description);
+  const preview = isFeatured
+    ? String(safePost.description || "")
+    : truncateText(String(safePost.description || ""), 185);
+  const tags = Array.isArray(safePost.tags)
+    ? safePost.tags
+        .slice(0, 3)
+        .map((tag) => `<span class="blog-tag">${escapeHtml(tag)}</span>`)
+        .join("")
+    : "";
+  const wrapperClass = isFeatured ? "blog-featured-item" : "blog-card";
+  const detailUrl = `/noticia.html?id=${encodeURIComponent(String(safePost.id || ""))}`;
+  const imageMarkup = buildBlogImageMarkup({
+    image: safePost.image,
+    alt: safePost.alt,
+    mode: isFeatured ? "featured" : "list",
+  });
+
+  return `
+      <article
+        id="post-${escapeHtml(safePost.id || "")}"
+        class="${wrapperClass}"
+        data-detail-url="${detailUrl}"
+        tabindex="0"
+        role="link"
+      >
+        <figure class="blog-media">
+          <a href="${detailUrl}" class="blog-image-link">
+            ${imageMarkup}
+          </a>
+        </figure>
+        <div>
+          <div class="blog-meta-line">
+            <span class="blog-chip">${escapeHtml(safePost.category || "General")}</span>
+            <span class="blog-date">${escapeHtml(formatBlogDate(safePost.date))}</span>
+            <span class="blog-reading">${reading} min de lectura</span>
+          </div>
+          <h3><a class="blog-title-link" href="${detailUrl}">${escapeHtml(safePost.title || "Noticia")}</a></h3>
+          <p>${escapeHtml(preview)}</p>
+          <div class="blog-tags">${tags}</div>
+          <a class="blog-open-link" href="${detailUrl}">Leer noticia completa</a>
+        </div>
+      </article>
+  `;
+}
+
+function buildBlogDetailPostMarkup(post, readingTime) {
+  const safePost = post || {};
+  const paragraphs = Array.isArray(safePost.content) && safePost.content.length
+    ? safePost.content
+    : [String(safePost.description || "")];
+  const tags = Array.isArray(safePost.tags)
+    ? safePost.tags.map((tag) => `<span class="blog-tag">${escapeHtml(tag)}</span>`).join("")
+    : "";
+
+  return `
+    <div class="blog-detail-meta">
+      <span class="blog-chip">${escapeHtml(safePost.category || "General")}</span>
+      <span class="blog-date">${escapeHtml(formatBlogDate(safePost.date))}</span>
+      <span class="blog-reading">${Math.max(1, Number(readingTime) || 1)} min de lectura</span>
+      <span class="blog-date">Autor: Equipo editorial</span>
+    </div>
+    <h2>${escapeHtml(safePost.title || "Noticia")}</h2>
+    <figure class="blog-detail-image">
+      ${buildBlogImageMarkup({
+        image: safePost.image,
+        alt: safePost.alt,
+        mode: "detail",
+      })}
+    </figure>
+    <p class="blog-detail-summary">${escapeHtml(safePost.description || "")}</p>
+    <div class="blog-detail-content">
+      ${paragraphs.map((line) => `<p>${linkifyBlogText(line)}</p>`).join("")}
+    </div>
+    <div class="blog-tags">${tags}</div>
+  `;
+}
+
+function buildBlogRelatedMarkup(posts) {
+  const safePosts = Array.isArray(posts) ? posts : [];
+  if (!safePosts.length) {
+    return '<p class="blog-empty">No hay más noticias para mostrar por ahora.</p>';
+  }
+
+  return safePosts
+    .map((post) => {
+      const detailUrl = `/noticia.html?id=${encodeURIComponent(String(post?.id || ""))}`;
+      return `
+        <article class="related-news-card">
+          <h3><a class="blog-title-link" href="${detailUrl}">${escapeHtml(post?.title || "Noticia")}</a></h3>
+          <p>${escapeHtml(post?.description || "")}</p>
+          <a class="blog-open-link" href="${detailUrl}">Leer completa</a>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function buildBlogImageMarkup({ image, alt, mode }) {
+  const cleanImage = String(image || "").trim();
+  const safeAlt = escapeHtml(String(alt || "Imagen de la noticia"));
+  const isEager = mode === "featured" || mode === "detail";
+  const loading = isEager ? "eager" : "lazy";
+  const fetchPriority = isEager ? "high" : "low";
+
+  if (!cleanImage) {
+    return '<div class="blog-image-fallback" aria-hidden="true"></div>';
+  }
+
+  const optimized = buildBlogOptimizedImageSources(cleanImage, mode);
+  if (!optimized) {
+    return `
+      <img
+        src="${escapeHtml(cleanImage)}"
+        alt="${safeAlt}"
+        loading="${loading}"
+        decoding="async"
+        fetchpriority="${fetchPriority}"
+      />
+    `;
+  }
+
+  return `
+    <picture>
+      <source
+        type="image/webp"
+        srcset="${escapeHtml(optimized.webpSrcSet)}"
+        sizes="${escapeHtml(optimized.sizes)}"
+      />
+      <img
+        src="${escapeHtml(optimized.fallbackSrc)}"
+        srcset="${escapeHtml(optimized.fallbackSrcSet)}"
+        sizes="${escapeHtml(optimized.sizes)}"
+        alt="${safeAlt}"
+        loading="${loading}"
+        decoding="async"
+        fetchpriority="${fetchPriority}"
+      />
+    </picture>
+  `;
+}
+
+function buildBlogOptimizedImageSources(imageUrl, mode = "list") {
+  if (!isOptimizableBlogUploadImage(imageUrl)) return null;
+
+  let widths = [280, 420, 640];
+  let quality = 74;
+  let sizes = "(max-width: 900px) 92vw, (max-width: 1120px) 44vw, 30vw";
+
+  if (mode === "featured") {
+    widths = [480, 768, 1024, 1360];
+    quality = 80;
+    sizes = "(max-width: 900px) 92vw, 58vw";
+  } else if (mode === "detail") {
+    widths = [720, 1024, 1360, 1680];
+    quality = 80;
+    sizes = "(max-width: 900px) 92vw, 78vw";
+  }
+
+  const webpSrcSet = widths
+    .map((width) => `${buildBlogOptimizedImageUrl(imageUrl, width, quality, "webp")} ${String(width)}w`)
+    .join(", ");
+  const fallbackSrcSet = widths
+    .map((width) => `${buildBlogOptimizedImageUrl(imageUrl, width, quality, "jpeg")} ${String(width)}w`)
+    .join(", ");
+  const fallbackWidth = widths[Math.max(0, widths.length - 2)] || widths[0];
+
+  return {
+    webpSrcSet,
+    fallbackSrcSet,
+    fallbackSrc: buildBlogOptimizedImageUrl(imageUrl, fallbackWidth, quality, "jpeg"),
+    sizes,
+  };
+}
+
+function buildBlogOptimizedImageUrl(sourceUrl, width, quality, format) {
+  const params = new URLSearchParams();
+  params.set("src", sourceUrl);
+  params.set("w", String(width));
+  params.set("q", String(quality));
+  params.set("fm", format);
+  return `/api/blog-image?${params.toString()}`;
+}
+
+function isOptimizableBlogUploadImage(imageUrl) {
+  const clean = String(imageUrl || "").trim();
+  if (!clean.startsWith("/uploads/")) return false;
+  return !/\.(svg|gif)(\?.*)?$/i.test(clean);
+}
+
+function parseBlogDate(value) {
+  const raw = String(value || "").trim();
+  const ymd = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+  if (ymd) {
+    const year = Number(ymd[1]);
+    const monthIndex = Number(ymd[2]) - 1;
+    const day = Number(ymd[3]);
+    return new Date(year, monthIndex, day, 12, 0, 0, 0);
+  }
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) {
+    return new Date(1970, 0, 1, 12, 0, 0, 0);
+  }
+
+  return parsed;
+}
+
+function formatBlogDate(value) {
+  const date = parseBlogDate(value);
+  try {
+    return new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(date);
+  } catch (_error) {
+    return String(value || "");
+  }
+}
+
+function truncateText(value, maxChars) {
+  const clean = String(value || "").trim();
+  if (!clean) return "";
+  if (clean.length <= maxChars) return clean;
+
+  const slice = clean.slice(0, maxChars);
+  const lastSpace = slice.lastIndexOf(" ");
+  return `${slice.slice(0, lastSpace > 30 ? lastSpace : maxChars).trim()}...`;
+}
+
+function estimateBlogReadingTime(content, description) {
+  const text = Array.isArray(content) && content.length ? content.join(" ") : String(description || "");
+  const words = text
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
+  return Math.max(1, Math.round(words / 170));
+}
+
+function linkifyBlogText(value) {
+  const input = String(value || "");
+  const markdownLinkPattern = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/gi;
+  let html = "";
+  let lastIndex = 0;
+  let match = markdownLinkPattern.exec(input);
+
+  while (match) {
+    const rawMatch = String(match[0] || "");
+    const linkText = String(match[1] || "").trim();
+    const rawUrl = String(match[2] || "");
+    const offset = Number(match.index || 0);
+    const { cleanUrl, suffix } = splitTrailingBlogUrlPunctuation(rawUrl);
+
+    html += linkifyBlogPlainText(input.slice(lastIndex, offset));
+    html += cleanUrl ? buildBlogExternalLink(cleanUrl, linkText || cleanUrl) : escapeHtml(rawMatch);
+
+    if (suffix) {
+      html += escapeHtml(suffix);
+    }
+
+    lastIndex = offset + rawMatch.length;
+    match = markdownLinkPattern.exec(input);
+  }
+
+  html += linkifyBlogPlainText(input.slice(lastIndex));
+  return html;
+}
+
+function linkifyBlogPlainText(value) {
+  const input = String(value || "");
+  const urlPattern = /https?:\/\/[^\s<>"']+/gi;
+  let html = "";
+  let lastIndex = 0;
+  let match = urlPattern.exec(input);
+
+  while (match) {
+    const rawUrl = String(match[0] || "");
+    const offset = Number(match.index || 0);
+    const { cleanUrl, suffix } = splitTrailingBlogUrlPunctuation(rawUrl);
+
+    html += escapeHtml(input.slice(lastIndex, offset));
+    html += cleanUrl ? buildBlogExternalLink(cleanUrl, cleanUrl) : escapeHtml(rawUrl);
+
+    if (suffix) {
+      html += escapeHtml(suffix);
+    }
+
+    lastIndex = offset + rawUrl.length;
+    match = urlPattern.exec(input);
+  }
+
+  html += escapeHtml(input.slice(lastIndex));
+  return html;
+}
+
+function buildBlogExternalLink(url, label) {
+  const safeUrl = sanitizeHttpUrl(url);
+  if (!safeUrl) {
+    return escapeHtml(label || url);
+  }
+
+  return `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label || safeUrl)}</a>`;
+}
+
+function sanitizeHttpUrl(url) {
+  const raw = String(url || "").trim();
+  if (!raw) return "";
+
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "";
+    return parsed.toString();
+  } catch (_error) {
+    return "";
+  }
+}
+
+function splitTrailingBlogUrlPunctuation(url) {
+  let cleanUrl = String(url || "");
+  let suffix = "";
+
+  while (/[),.;:!?]$/.test(cleanUrl)) {
+    suffix = cleanUrl.slice(-1) + suffix;
+    cleanUrl = cleanUrl.slice(0, -1);
+  }
+
+  return {
+    cleanUrl,
+    suffix,
+  };
+}
+
+function toAbsoluteAssetUrl(baseUrl, imagePath) {
+  const raw = String(imagePath || "").trim();
+  if (!raw) return "";
+  if (/^https?:\/\//i.test(raw)) return raw;
+  return makeAbsoluteUrl(baseUrl, raw);
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function getClientIp(req) {
@@ -987,8 +1632,8 @@ app.get("/sitemap.xml", async (req, res) => {
     const posts = await listBlogPosts();
 
     const staticEntries = PUBLIC_SITE_PATHS.map((pathname) => {
-      const priority = pathname === "/" ? "1.0" : pathname === "/blog.html" ? "0.9" : "0.7";
-      const changefreq = pathname === "/" ? "daily" : "weekly";
+      const priority = pathname === "/" ? "1.0" : pathname === "/herramienta.html" ? "0.9" : pathname === "/blog.html" ? "0.8" : "0.7";
+      const changefreq = pathname === "/" || pathname === "/herramienta.html" ? "daily" : "weekly";
 
       return {
         loc: makeAbsoluteUrl(baseUrl, pathname),
@@ -1421,7 +2066,7 @@ app.post("/api/generate-visa-pdf", withRateLimit("visa-pdf", RATE_LIMIT_CONFIG.g
 });
 
 app.use((_req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+  return res.status(404).type("text/plain; charset=utf-8").send("Página no encontrada.");
 });
 
 app.listen(port, () => {

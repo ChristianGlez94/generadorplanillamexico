@@ -19,6 +19,7 @@ function toAbsolutePath(href) {
 
 function markCurrentNavigationLink() {
   const currentPath = normalizePathname(window.location.pathname);
+  const currentIsBlog = currentPath === "/" || currentPath === "/blog.html";
   const selectors = ".hero-nav a, .footer-links a";
   const links = document.querySelectorAll(selectors);
 
@@ -28,7 +29,8 @@ function markCurrentNavigationLink() {
 
     const matches =
       currentPath === linkPath ||
-      (linkPath === "/blog.html" && currentPath === "/noticia.html");
+      (linkPath === "/" && currentPath === "/noticia.html") ||
+      (linkPath === "/" && currentIsBlog);
 
     if (matches) {
       link.classList.add("is-current");

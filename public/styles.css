@@ -186,6 +186,27 @@ form {
   font-weight: 700;
 }
 
+.card h3 {
+  margin: 0.65rem 0 0.35rem;
+  color: #5f1220;
+  font-size: 1rem;
+}
+
+.card p {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.card ul {
+  margin: 0.2rem 0 0;
+  padding-left: 1.15rem;
+  color: var(--muted);
+}
+
+.card li + li {
+  margin-top: 0.3rem;
+}
+
 .grid {
   display: grid;
   gap: 0.8rem;

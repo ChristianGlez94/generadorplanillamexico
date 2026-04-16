@@ -90,10 +90,22 @@ if (
   });
 
   async function init() {
-    blogCount.textContent = "Cargando noticias...";
-    blogLastUpdate.textContent = "Última actualización: --";
-    featuredPost.innerHTML = '<p class="blog-empty">Cargando contenido...</p>';
-    blogList.innerHTML = "";
+    const hasServerRenderedFeatured = featuredPost.children.length > 0;
+    const hasServerRenderedList = blogList.children.length > 0;
+    const hasServerRenderedStats =
+      blogCount.textContent.trim() !== "0 noticias" ||
+      blogLastUpdate.textContent.trim() !== "Última actualización: --";
+
+    if (!hasServerRenderedFeatured && !hasServerRenderedList) {
+      featuredPost.innerHTML = '<p class="blog-empty">Cargando contenido...</p>';
+      blogList.innerHTML = "";
+    }
+
+    if (!hasServerRenderedStats) {
+      blogCount.textContent = "Cargando noticias...";
+      blogLastUpdate.textContent = "Última actualización: --";
+    }
+
     renderPagination();
 
     await loadAndRenderPosts();
