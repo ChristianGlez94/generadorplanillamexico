@@ -17,6 +17,10 @@ const { visaFormSchema } = require("./src/validation/visaSchema");
 const { blogPostCreateSchema } = require("./src/validation/blogSchema");
 const { fillVisaPdf } = require("./src/services/pdfFiller");
 const {
+  createNutProjectionModelFromCsvFile,
+  buildNutProjection,
+} = require("./src/services/nutProjectionModel");
+const {
   listBlogPosts,
   getBlogPostById,
   createBlogPost,
@@ -48,6 +52,9 @@ const RECAPTCHA_SECRET_KEY = String(process.env.RECAPTCHA_SECRET_KEY || "").trim
 const RECAPTCHA_ACTION = String(process.env.RECAPTCHA_ACTION || "generate_visa_pdf").trim() || "generate_visa_pdf";
 const RECAPTCHA_MIN_SCORE = parseRecaptchaMinScore(process.env.RECAPTCHA_MIN_SCORE);
 const RECAPTCHA_ENABLED = Boolean(RECAPTCHA_SITE_KEY && RECAPTCHA_SECRET_KEY);
+const NUT_MODEL_CSV_PATH = String(
+  process.env.NUT_MODEL_CSV_PATH || path.join(__dirname, "model-nut", "nut_assignments.csv")
+).trim();
 const LEGACY_UPLOADS_DIR = path.join(__dirname, "public", "uploads");
 const UPLOADS_DIR = BLOG_STORAGE_DIR
   ? path.join(path.resolve(BLOG_STORAGE_DIR), "uploads")
@@ -75,6 +82,7 @@ const OPTIMIZED_IMAGE_MIME_BY_FORMAT = {
 const PUBLIC_SITE_PATHS = [
   "/",
   "/herramienta.html",
+  "/estimador-nut.html",
   "/archivo-noticias.html",
   "/sobre-esta-herramienta.html",
   "/contacto.html",
@@ -87,6 +95,12 @@ const RATE_LIMIT_CONFIG = {
   reporterLogin: { windowMs: 15 * 60 * 1000, max: 8 },
   reporterWrite: { windowMs: 60 * 1000, max: 30 },
   generatePdf: { windowMs: 60 * 1000, max: 30 },
+  nutForecast: { windowMs: 60 * 1000, max: 60 },
+};
+const NUT_MODEL_STATE = {
+  bundle: null,
+  loadingPromise: null,
+  lastError: null,
 };
 
 if (!REPORTER_PASSWORD) {
@@ -264,6 +278,38 @@ async function ensureImageVariantsDir() {
 }
 
 void ensureImageVariantsDir();
+
+async function ensureNutProjectionModelLoaded() {
+  if (NUT_MODEL_STATE.bundle) {
+    return NUT_MODEL_STATE.bundle;
+  }
+
+  if (NUT_MODEL_STATE.loadingPromise) {
+    return NUT_MODEL_STATE.loadingPromise;
+  }
+
+  NUT_MODEL_STATE.loadingPromise = createNutProjectionModelFromCsvFile(NUT_MODEL_CSV_PATH)
+    .then((bundle) => {
+      NUT_MODEL_STATE.bundle = bundle;
+      NUT_MODEL_STATE.lastError = null;
+      console.log(
+        `[nut-model] Modelo cargado. registros=${bundle.metadata.recordsCount} rangoNUT=${bundle.metadata.minNut}-${bundle.metadata.maxNut}`
+      );
+      return bundle;
+    })
+    .catch((error) => {
+      NUT_MODEL_STATE.lastError = error;
+      console.error("[nut-model] No se pudo cargar el modelo de proyección NUT:", error);
+      return null;
+    })
+    .finally(() => {
+      NUT_MODEL_STATE.loadingPromise = null;
+    });
+
+  return NUT_MODEL_STATE.loadingPromise;
+}
+
+void ensureNutProjectionModelLoaded();
 
 function setPublicStaticCacheHeaders(res, filePath) {
   const extension = path.extname(filePath).toLowerCase();
@@ -554,6 +600,20 @@ function parsePositiveInteger(rawValue, fallback, max = Infinity) {
   }
 
   return Math.min(parsed, max);
+}
+
+function parseNutNumber(rawValue) {
+  const clean = String(rawValue || "").replace(/\s+/g, "");
+  if (!/^\d{7}$/.test(clean)) {
+    return null;
+  }
+
+  const parsed = Number.parseInt(clean, 10);
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+
+  return parsed;
 }
 
 function collectBlogCategories(posts) {
@@ -1737,6 +1797,39 @@ app.get("/api/recaptcha-config", (_req, res) => {
   });
 });
 
+app.get("/api/nut-forecast", withRateLimit("nut-forecast", RATE_LIMIT_CONFIG.nutForecast), async (req, res) => {
+  const nutValue = parseNutNumber(getSingleQueryValue(req.query.nut));
+  if (nutValue === null) {
+    return res.status(400).json({
+      message: "Debes indicar un NUT válido de 7 dígitos en el parámetro nut.",
+    });
+  }
+
+  const modelBundle = await ensureNutProjectionModelLoaded();
+  if (!modelBundle) {
+    return res.status(503).json({
+      message: "El modelo de proyección NUT no está disponible temporalmente.",
+    });
+  }
+
+  const projection = buildNutProjection(modelBundle, nutValue);
+  return res.json({
+    ...projection,
+    model: {
+      recordsCount: modelBundle.metadata.recordsCount,
+      minNut: modelBundle.metadata.minNut,
+      maxNut: modelBundle.metadata.maxNut,
+      minDate: modelBundle.metadata.minDate,
+      maxDate: modelBundle.metadata.maxDate,
+      maeBacktestDays: modelBundle.metadata.maeBacktestDays,
+      p80AbsErrorDays: modelBundle.metadata.p80AbsErrorDays,
+      p95AbsErrorDays: modelBundle.metadata.p95AbsErrorDays,
+      estimatedRecentVelocityNutPerDay: modelBundle.metadata.estimatedRecentVelocityNutPerDay,
+      loadedAt: modelBundle.metadata.loadedAt,
+    },
+  });
+});
+
 app.get("/robots.txt", (req, res) => {
   const baseUrl = resolveBaseUrl(req);
   const lines = [
@@ -1763,6 +1856,8 @@ app.get("/sitemap.xml", async (req, res) => {
         ? "1.0"
         : pathname === "/herramienta.html"
           ? "0.9"
+          : pathname === "/estimador-nut.html"
+            ? "0.85"
           : pathname === "/archivo-noticias.html"
             ? "0.8"
             : "0.7";

@@ -24,7 +24,9 @@ Aplicacion web para capturar los datos del solicitante y generar automaticamente
 - `src/validation/blogSchema.js`: validacion de creacion de noticias.
 - `src/validation/visaSchema.js`: reglas de validacion.
 - `src/services/pdfFiller.js`: motor de relleno del PDF.
+- `src/services/nutProjectionModel.js`: modelo matematico para proyeccion de fecha probable por NUT.
 - `src/config/pdfLayout.js`: coordenadas de campos (calibrables).
+- `model-nut/nut_assignments.csv`: historico de NUT con fecha de asignacion usado por el modelo.
 - `assets/visa-template.pdf`: planilla base.
 
 ## Instalacion y uso
@@ -43,6 +45,17 @@ Abrir en navegador: [http://localhost:3000](http://localhost:3000)
 3. El backend valida el token anti-bots y todos los datos del formulario.
 4. Se genera el PDF final con letra profesional y marcas `X`.
 5. Se descarga automaticamente el archivo listo para imprimir.
+
+## Estimador NUT integrado
+
+- La interfaz independiente del estimador esta en `/estimador-nut.html`.
+- API usada por la web: `GET /api/nut-forecast?nut=7449000`
+- El modelo usa regresion robusta + ajuste local y entrega:
+  - fecha probable,
+  - ventana probable 80%,
+  - ventana probable 95%,
+  - nivel de confianza relativo.
+- Es una estimacion estadistica y no sustituye el listado oficial del Consulado.
 
 ## Cambios de calibracion
 
@@ -78,6 +91,7 @@ Abrir en navegador: [http://localhost:3000](http://localhost:3000)
 - `RECAPTCHA_SECRET_KEY`: clave secreta de Google reCAPTCHA v3 (solo backend).
 - `RECAPTCHA_ACTION`: accion esperada para validar el token (por defecto: `generate_visa_pdf`).
 - `RECAPTCHA_MIN_SCORE`: puntaje minimo aceptado entre `0` y `1` (por defecto recomendado: `0.5`).
+- `NUT_MODEL_CSV_PATH`: opcional. Ruta al CSV historico de NUT (por defecto: `model-nut/nut_assignments.csv` dentro del proyecto).
 
 ## Persistencia en Render (evitar perdida de noticias)
 

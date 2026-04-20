@@ -299,6 +299,60 @@ small {
   box-shadow: var(--card-shadow);
 }
 
+.nut-forecast-grid {
+  margin-bottom: 0;
+  align-items: end;
+}
+
+.nut-forecast-actions {
+  display: grid;
+  gap: 0.6rem;
+  align-content: end;
+}
+
+.nut-forecast-actions button {
+  width: fit-content;
+}
+
+.nut-forecast-result {
+  margin-top: 0.85rem;
+  border: 1px solid #d8cdbd;
+  border-radius: 10px;
+  background: #fffdf8;
+  padding: 0.78rem 0.9rem;
+  display: grid;
+  gap: 0.34rem;
+}
+
+.nut-forecast-result p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.nut-forecast-main {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.nut-forecast-meta {
+  color: #786f62;
+  font-size: 0.86rem;
+}
+
+#nutForecastStatus {
+  margin: 0;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+#nutForecastStatus.ok {
+  color: var(--ok);
+}
+
+#nutForecastStatus.error {
+  color: var(--error);
+}
+
 .recaptcha-disclaimer {
   margin: 0;
   width: 100%;
@@ -1081,6 +1135,10 @@ article[data-detail-url]:focus-visible {
   .actions {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .nut-forecast-actions button {
+    width: 100%;
   }
 
   .footer-links {

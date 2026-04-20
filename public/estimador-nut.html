@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Archivo completo de noticias | Planilla Visa México</title>
+    <title>Estimador NUT | Planilla Visa México</title>
     <link rel="icon" type="image/x-icon" href="/favicon_planilla_mexico_v2.ico" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -11,7 +11,7 @@
       href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700&family=Libre+Baskerville:wght@700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/styles.css?v=20260416_archivepage" />
+    <link rel="stylesheet" href="/styles.css?v=20260416_footerbadgefix" />
     <script
       async
       src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4829103587402480"
@@ -21,16 +21,16 @@
   <body>
     <div class="background-glow" aria-hidden="true"></div>
 
-    <main class="layout">
+    <main class="layout legal-layout">
       <header class="hero">
-        <p class="eyebrow">Archivo editorial</p>
-        <h1>Archivo completo de noticias</h1>
+        <p class="eyebrow">Herramienta independiente</p>
+        <h1>Estimador NUT</h1>
         <p>
-          Accede a todas las publicaciones organizadas por fecha para consultar noticias anteriores.
+          Consulta una fecha probable de asignación para tu NUT usando un modelo matemático
+          entrenado con histórico de listados publicados.
         </p>
         <nav class="hero-nav" aria-label="Navegación principal del sitio">
           <a href="/">Blog</a>
-          <a href="/archivo-noticias.html">Archivo</a>
           <a href="/herramienta.html">Herramienta</a>
           <a href="/estimador-nut.html">Estimador NUT</a>
           <a href="/sobre-esta-herramienta.html">Sobre esta herramienta</a>
@@ -41,27 +41,46 @@
         </nav>
       </header>
 
-      <section class="card blog-toolbar">
-        <h2>Resumen del archivo</h2>
-        <div class="blog-meta" aria-live="polite">
-          <p id="archiveCount">0 noticias publicadas</p>
-          <p id="archiveLastUpdate">Última actualización: --</p>
+      <section class="card">
+        <h2>Modelo matemático NUT: fecha probable de asignación</h2>
+        <p>
+          El resultado es una proyección estadística. No sustituye la publicación oficial del
+          Consulado.
+        </p>
+        <div class="grid two nut-forecast-grid">
+          <label>
+            Número NUT (7 dígitos)
+            <input
+              type="text"
+              id="nutForecastInput"
+              maxlength="7"
+              inputmode="numeric"
+              pattern="\d{7}"
+              placeholder="Ejemplo: 7449000"
+            />
+            <small>Escribe solo números, sin espacios ni guiones.</small>
+          </label>
+          <div class="nut-forecast-actions">
+            <button type="button" id="nutForecastBtn">Calcular fecha probable</button>
+            <p id="nutForecastStatus" role="status" aria-live="polite"></p>
+          </div>
+        </div>
+        <div id="nutForecastResult" class="nut-forecast-result hidden" aria-live="polite">
+          <p id="nutForecastMain" class="nut-forecast-main"></p>
+          <p id="nutForecastKnown"></p>
+          <p id="nutForecastWindow80"></p>
+          <p id="nutForecastWindow95"></p>
+          <p id="nutForecastConfidence"></p>
+          <p id="nutForecastMeta" class="nut-forecast-meta"></p>
         </div>
       </section>
 
-      <section class="card blog-archive-wrap">
-        <h2>Todas las noticias del sitio</h2>
-        <ul id="blogArchive" class="blog-archive-list" aria-live="polite">
-          <li class="blog-empty">Cargando archivo de noticias...</li>
-        </ul>
-      </section>
-
-      <section class="card">
-        <h2>Volver al blog principal</h2>
+      <section class="legal-card">
+        <h2>Importante</h2>
         <p>
-          Para ver noticias destacadas, filtros y paginación interactiva, regresa al blog principal.
+          Si tu NUT ya aparece en el histórico, se muestra la fecha registrada. Si aún no aparece,
+          verás una fecha probable con ventanas de incertidumbre.
         </p>
-        <a class="blog-cta" href="/">Ir al blog principal</a>
       </section>
 
       <footer class="site-footer">
@@ -88,7 +107,6 @@
         </div>
         <div class="footer-links">
           <a href="/">Blog</a>
-          <a href="/archivo-noticias.html">Archivo</a>
           <a href="/herramienta.html">Herramienta</a>
           <a href="/estimador-nut.html">Estimador NUT</a>
           <a href="/sobre-esta-herramienta.html">Sobre esta herramienta</a>
@@ -101,6 +119,8 @@
         <p class="footer-copy">&copy; 2026 Generador Planilla México. Todos los derechos reservados.</p>
       </footer>
     </main>
+
+    <script src="/nut-forecast.js?v=20260420_nut_menu_move_v1" defer></script>
     <script src="/site-shell.js?v=20260407_1030" defer></script>
   </body>
 </html>
