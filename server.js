@@ -221,16 +221,22 @@ app.get("/noticia.html", async (req, res) => {
   try {
     const postId = String(getSingleQueryValue(req.query.id) || "").trim();
     const posts = await listBlogPosts();
-    const selectedPost = postId ? await getBlogPostById(postId) : null;
+    const resolution = resolveBlogPostByRequestedId(posts, postId);
+
+    if (resolution.shouldRedirect && resolution.canonicalId) {
+      return res.redirect(301, buildBlogPostUrl(resolution.canonicalId));
+    }
+
+    const selectedPost = resolution.post;
     const html = await renderBlogDetailHtml({
       baseUrl: resolveBaseUrl(req),
       post: selectedPost,
       posts,
-      requestedPostId: postId,
+      requestedPostId: resolution.requestedId || postId,
     });
 
     res.setHeader("Cache-Control", "no-store");
-    if (postId && !selectedPost) {
+    if (resolution.requestedId && !selectedPost) {
       return res.status(404).type("text/html; charset=utf-8").send(html);
     }
 
@@ -581,6 +587,119 @@ function toIsoTimestamp(value) {
   const parsed = new Date(raw);
   if (Number.isNaN(parsed.getTime())) return new Date().toISOString();
   return parsed.toISOString();
+}
+
+function normalizeBlogPostId(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 72);
+}
+
+function stripTrailingYearFromBlogId(postId) {
+  const cleanId = normalizeBlogPostId(postId);
+  if (!cleanId) return "";
+  const match = cleanId.match(/^(.*)-(19|20)\d{2}$/);
+  if (!match) return "";
+  return String(match[1] || "").replace(/-+$/g, "");
+}
+
+function buildLoosePostTitleKey(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\b(19|20)\d{2}\b/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function areLikelySameBlogPost(first, second) {
+  const firstKey = buildLoosePostTitleKey(first?.title);
+  const secondKey = buildLoosePostTitleKey(second?.title);
+  if (!firstKey || !secondKey) return false;
+  return firstKey === secondKey;
+}
+
+function buildBlogPostIndex(posts) {
+  const safePosts = Array.isArray(posts) ? posts : [];
+  const byId = new Map();
+
+  for (const post of safePosts) {
+    const cleanId = normalizeBlogPostId(post?.id);
+    if (!cleanId || byId.has(cleanId)) continue;
+    byId.set(cleanId, post);
+  }
+
+  return byId;
+}
+
+function resolveBlogPostByRequestedId(posts, requestedId) {
+  const cleanRequestedId = normalizeBlogPostId(requestedId);
+  if (!cleanRequestedId) {
+    return {
+      requestedId: "",
+      canonicalId: "",
+      post: null,
+      shouldRedirect: false,
+    };
+  }
+
+  const byId = buildBlogPostIndex(posts);
+  const directPost = byId.get(cleanRequestedId) || null;
+  const baseId = stripTrailingYearFromBlogId(cleanRequestedId);
+  const basePost = baseId ? byId.get(baseId) || null : null;
+
+  if (basePost && baseId !== cleanRequestedId) {
+    if (!directPost || areLikelySameBlogPost(directPost, basePost)) {
+      return {
+        requestedId: cleanRequestedId,
+        canonicalId: baseId,
+        post: basePost,
+        shouldRedirect: true,
+      };
+    }
+  }
+
+  return {
+    requestedId: cleanRequestedId,
+    canonicalId: cleanRequestedId,
+    post: directPost,
+    shouldRedirect: false,
+  };
+}
+
+function buildCanonicalBlogPostEntries(posts) {
+  const safePosts = Array.isArray(posts) ? posts : [];
+  const byId = buildBlogPostIndex(safePosts);
+  const canonicalEntries = new Map();
+
+  for (const post of safePosts) {
+    const cleanId = normalizeBlogPostId(post?.id);
+    if (!cleanId) continue;
+
+    let canonicalId = cleanId;
+    let canonicalPost = post;
+    const baseId = stripTrailingYearFromBlogId(cleanId);
+    const basePost = baseId ? byId.get(baseId) || null : null;
+
+    if (basePost && baseId !== cleanId && areLikelySameBlogPost(post, basePost)) {
+      canonicalId = baseId;
+      canonicalPost = basePost;
+    }
+
+    if (!canonicalEntries.has(canonicalId)) {
+      canonicalEntries.set(canonicalId, canonicalPost);
+    }
+  }
+
+  return [...canonicalEntries.entries()].map(([canonicalId, post]) => ({
+    canonicalId,
+    post,
+  }));
 }
 
 function getSingleQueryValue(value) {
@@ -1850,6 +1969,7 @@ app.get("/sitemap.xml", async (req, res) => {
     const baseUrl = resolveBaseUrl(req);
     const nowIso = new Date().toISOString();
     const posts = await listBlogPosts();
+    const canonicalPostEntries = buildCanonicalBlogPostEntries(posts);
 
     const staticEntries = PUBLIC_SITE_PATHS.map((pathname) => {
       const priority = pathname === "/"
@@ -1871,9 +1991,9 @@ app.get("/sitemap.xml", async (req, res) => {
       };
     });
 
-    const postEntries = posts.map((post) => ({
-      loc: makeAbsoluteUrl(baseUrl, buildBlogPostUrl(post.id)),
-      lastmod: toIsoTimestamp(post.createdAt || post.date),
+    const postEntries = canonicalPostEntries.map((entry) => ({
+      loc: makeAbsoluteUrl(baseUrl, buildBlogPostUrl(entry.canonicalId)),
+      lastmod: toIsoTimestamp(entry.post?.createdAt || entry.post?.date),
       changefreq: "weekly",
       priority: "0.8",
     }));
