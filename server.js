@@ -176,6 +176,16 @@ app.use(express.json({ limit: "10mb" }));
 app.get("/", async (req, res) => {
   try {
     const posts = await listBlogPosts();
+    const canonicalBlogHref = buildCanonicalBlogListRedirectHref({
+      basePath: "/",
+      pageValue: req.query.page,
+      query: req.query,
+      totalItems: posts.length,
+    });
+    if (canonicalBlogHref) {
+      return res.redirect(301, canonicalBlogHref);
+    }
+
     const requestedPage = parsePositiveInteger(getSingleQueryValue(req.query.page), 1);
     const html = await renderBlogListHtml({
       baseUrl: resolveBaseUrl(req),
@@ -196,6 +206,21 @@ app.get("/", async (req, res) => {
 });
 
 app.get("/blog.html", async (req, res) => {
+  try {
+    const posts = await listBlogPosts();
+    const canonicalBlogHref = buildCanonicalBlogListRedirectHref({
+      basePath: "/",
+      pageValue: req.query.page,
+      query: req.query,
+      totalItems: posts.length,
+    });
+    if (canonicalBlogHref) {
+      return res.redirect(301, canonicalBlogHref);
+    }
+  } catch (error) {
+    console.error("Error resolviendo redirección canónica de /blog.html:", error);
+  }
+
   const queryStart = String(req.originalUrl || "").indexOf("?");
   const queryString = queryStart >= 0 ? String(req.originalUrl || "").slice(queryStart) : "";
   return res.redirect(301, `/${queryString}`);
@@ -219,12 +244,17 @@ app.get("/archivo-noticias.html", async (req, res) => {
 
 app.get("/noticia.html", async (req, res) => {
   try {
-    const postId = String(getSingleQueryValue(req.query.id) || "").trim();
+    const queryIdValue = req.query.id;
+    const postId = String(getSingleQueryValue(queryIdValue) || "").trim();
     const posts = await listBlogPosts();
     const resolution = resolveBlogPostByRequestedId(posts, postId);
 
-    if (resolution.shouldRedirect && resolution.canonicalId) {
-      return res.redirect(301, buildBlogPostUrl(resolution.canonicalId));
+    const canonicalNewsHref = buildCanonicalNewsRedirectHref({
+      queryIdValue,
+      resolution,
+    });
+    if (canonicalNewsHref) {
+      return res.redirect(301, canonicalNewsHref);
     }
 
     const selectedPost = resolution.post;
@@ -1244,6 +1274,92 @@ function buildBlogPageHref(basePath, page) {
   const safePage = Math.max(1, Number(page) || 1);
   if (safePage <= 1) return cleanBase;
   return `${cleanBase}?page=${String(safePage)}`;
+}
+
+function buildCanonicalBlogListRedirectHref({ basePath = "/", pageValue, query, totalItems = 0 }) {
+  if (pageValue === undefined) {
+    return "";
+  }
+
+  const pageValues = Array.isArray(pageValue) ? pageValue : [pageValue];
+  const hasMultiplePageValues = pageValues.length > 1;
+  const rawPage = String(getSingleQueryValue(pageValue) || "").trim();
+  const parsedPageCandidate = Number.parseInt(rawPage, 10);
+  const isPositiveInteger =
+    /^\d+$/.test(rawPage)
+    && Number.isFinite(parsedPageCandidate)
+    && parsedPageCandidate > 0;
+  const parsedPage = isPositiveInteger ? parsedPageCandidate : 1;
+  const totalPages = Math.max(1, Math.ceil(Math.max(0, Number(totalItems) || 0) / BLOG_PAGE_SIZE));
+  const canonicalPage = Math.min(Math.max(1, parsedPage), totalPages);
+
+  const incomingIsCanonical =
+    !hasMultiplePageValues
+    && isPositiveInteger
+    && rawPage === String(parsedPage)
+    && parsedPage === canonicalPage
+    && canonicalPage > 1;
+  if (incomingIsCanonical) {
+    return "";
+  }
+
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query || {})) {
+    if (key === "page") continue;
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (item === undefined || item === null) continue;
+        params.append(key, String(item));
+      }
+      continue;
+    }
+
+    if (value !== undefined && value !== null) {
+      params.append(key, String(value));
+    }
+  }
+
+  if (canonicalPage > 1) {
+    params.set("page", String(canonicalPage));
+  }
+
+  const cleanBasePath = String(basePath || "/").trim() || "/";
+  const queryString = params.toString();
+  return queryString ? `${cleanBasePath}?${queryString}` : cleanBasePath;
+}
+
+function buildCanonicalNewsRedirectHref({ queryIdValue, resolution }) {
+  const canonicalId = String(resolution?.canonicalId || "").trim();
+  const hasCanonicalTarget = Boolean(canonicalId);
+  if (!hasCanonicalTarget) {
+    return "";
+  }
+
+  const hasResolvedPost = Boolean(resolution?.post);
+  if (!hasResolvedPost && !resolution?.shouldRedirect) {
+    return "";
+  }
+
+  if (resolution?.shouldRedirect) {
+    return buildBlogPostUrl(canonicalId);
+  }
+
+  const rawIds = Array.isArray(queryIdValue) ? queryIdValue : [queryIdValue];
+  if (rawIds.length > 1) {
+    return buildBlogPostUrl(canonicalId);
+  }
+
+  const rawId = String(getSingleQueryValue(queryIdValue) || "");
+  if (!rawId.trim()) {
+    return "";
+  }
+
+  if (rawId !== canonicalId) {
+    return buildBlogPostUrl(canonicalId);
+  }
+
+  return "";
 }
 
 function buildBlogImageMarkup({ image, alt, mode }) {
