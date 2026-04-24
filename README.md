@@ -52,8 +52,8 @@ Abrir en navegador: [http://localhost:3000](http://localhost:3000)
 - API usada por la web: `GET /api/nut-forecast?nut=7449000`
 - El modelo usa regresion robusta + ajuste local y entrega:
   - fecha probable,
-  - ventana probable 80%,
-  - ventana probable 95%,
+  - ventana probable 80% (en dias habiles),
+  - ventana probable 95% (en dias habiles),
   - nivel de confianza relativo.
 - Es una estimacion estadistica y no sustituye el listado oficial del Consulado.
 

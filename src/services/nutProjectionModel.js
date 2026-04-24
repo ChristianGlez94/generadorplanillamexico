@@ -40,21 +40,80 @@ function addDays(dateValue, days) {
   return new Date(dateValue.getTime() + Number(days) * DAY_MS);
 }
 
-function daysBetween(startDate, endDate) {
-  return Math.round((endDate.getTime() - startDate.getTime()) / DAY_MS);
+function isWeekend(dateValue) {
+  const dayOfWeek = dateValue.getUTCDay();
+  return dayOfWeek === 0 || dayOfWeek === 6;
+}
+
+function moveToPreviousWeekday(value) {
+  let cursor = value;
+
+  while (isWeekend(cursor)) {
+    cursor = addDays(cursor, -1);
+  }
+
+  return cursor;
 }
 
 function moveToNextWeekday(value) {
   let cursor = value;
 
-  while (true) {
-    const dayOfWeek = cursor.getUTCDay();
-    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-      return cursor;
-    }
-
+  while (isWeekend(cursor)) {
     cursor = addDays(cursor, 1);
   }
+
+  return cursor;
+}
+
+function addBusinessDays(dateValue, businessDays) {
+  let remaining = Number.isFinite(businessDays) ? Math.trunc(businessDays) : 0;
+  let cursor = new Date(dateValue.getTime());
+
+  if (remaining === 0) {
+    return moveToNextWeekday(cursor);
+  }
+
+  cursor = remaining > 0
+    ? moveToNextWeekday(cursor)
+    : moveToPreviousWeekday(cursor);
+
+  const step = remaining > 0 ? 1 : -1;
+  while (remaining !== 0) {
+    cursor = addDays(cursor, step);
+    if (!isWeekend(cursor)) {
+      remaining -= step;
+    }
+  }
+
+  return cursor;
+}
+
+function businessDaysBetween(startDate, endDate) {
+  const startTime = startDate.getTime();
+  const endTime = endDate.getTime();
+
+  if (startTime === endTime) return 0;
+  if (startTime > endTime) {
+    return -businessDaysBetween(endDate, startDate);
+  }
+
+  const startDayNumber = Math.floor(startTime / DAY_MS);
+  const endDayNumber = Math.floor(endTime / DAY_MS);
+  const deltaDays = endDayNumber - startDayNumber;
+
+  const fullWeeks = Math.floor(deltaDays / 7);
+  const remainder = deltaDays % 7;
+  const startDow = startDate.getUTCDay();
+
+  let businessDays = fullWeeks * 5;
+  for (let offset = 1; offset <= remainder; offset += 1) {
+    const dayOfWeek = (startDow + offset) % 7;
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      businessDays += 1;
+    }
+  }
+
+  return businessDays;
 }
 
 function quantile(values, q) {
@@ -176,7 +235,7 @@ function computeRecentSlope(records) {
   const dailySlopes = [];
 
   for (let i = 0; i < recent.length - 1; i += 1) {
-    const dayGap = daysBetween(recent[i].date, recent[i + 1].date);
+    const dayGap = businessDaysBetween(recent[i].date, recent[i + 1].date);
     const nutGap = recent[i + 1].nut - recent[i].nut;
     if (dayGap <= 0 || nutGap <= 0) continue;
     dailySlopes.push(dayGap / nutGap);
@@ -204,7 +263,7 @@ function buildModelCore(records, options = {}) {
     .sort((a, b) => b.getTime() - a.getTime())[0];
 
   const xs = sortedByNut.map((record) => record.nut);
-  const ys = sortedByNut.map((record) => daysBetween(minDate, record.appointmentDate));
+  const ys = sortedByNut.map((record) => businessDaysBetween(minDate, record.appointmentDate));
   const slope = theilSenSlope(xs, ys);
   const intercept = median(ys.map((day, index) => day - slope * xs[index]));
   const residuals = ys.map((day, index) => day - (intercept + slope * xs[index]));
@@ -259,7 +318,7 @@ function rollingBacktestErrors(records, minDateReference) {
 
     const model = buildModelCore(train, { calibrateUncertainty: false });
     for (const sample of test) {
-      const expected = daysBetween(minDateReference, sample.appointmentDate);
+      const expected = businessDaysBetween(minDateReference, sample.appointmentDate);
       const predicted = model.predictDayIndex(sample.nut);
       absErrors.push(Math.abs(expected - predicted));
     }
@@ -329,8 +388,7 @@ function predictDayIndex(model, nutValue) {
 
 function predictDate(model, nutValue) {
   const predictedDay = Math.max(0, Math.round(predictDayIndex(model, nutValue)));
-  const raw = addDays(model.minDate, predictedDay);
-  return moveToNextWeekday(raw);
+  return addBusinessDays(model.minDate, predictedDay);
 }
 
 function predictionWindow(model, nutValue, level = 0.8) {
@@ -338,8 +396,8 @@ function predictionWindow(model, nutValue, level = 0.8) {
   const spread = level <= 0.8 ? model.p80AbsErrorDays : model.p95AbsErrorDays;
   const lowDay = Math.max(0, Math.floor(center - spread));
   const highDay = Math.max(0, Math.ceil(center + spread));
-  const low = moveToNextWeekday(addDays(model.minDate, lowDay));
-  const high = moveToNextWeekday(addDays(model.minDate, highDay));
+  const low = addBusinessDays(model.minDate, lowDay);
+  const high = addBusinessDays(model.minDate, highDay);
 
   return {
     from: low,
@@ -398,6 +456,7 @@ async function createNutProjectionModelFromCsvFile(filePath) {
       p80AbsErrorDays: Number(model.p80AbsErrorDays.toFixed(2)),
       p95AbsErrorDays: Number(model.p95AbsErrorDays.toFixed(2)),
       estimatedRecentVelocityNutPerDay: Number((1 / model.recentSlopeDaysPerNut).toFixed(0)),
+      estimatedRecentVelocityNutPerBusinessDay: Number((1 / model.recentSlopeDaysPerNut).toFixed(0)),
       loadedAt: new Date().toISOString(),
     },
   };
@@ -420,7 +479,7 @@ function buildNutProjection(modelBundle, nutValue) {
   const knownIndex = model.xs.indexOf(nutValue);
   const isKnownNut = knownIndex >= 0;
   const knownDate = isKnownNut
-    ? addDays(model.minDate, Math.round(model.ys[knownIndex]))
+    ? addBusinessDays(model.minDate, Math.round(model.ys[knownIndex]))
     : null;
   const predictedDate = isKnownNut ? knownDate : model.predictDate(nutValue);
   const p80 = isKnownNut

@@ -59,7 +59,7 @@ function renderNutForecastResult(result) {
   nutForecastConfidence.textContent = `Nivel de confianza del cálculo: ${confidenceLabel}.`;
 
   nutForecastMeta.textContent =
-    `Modelo entrenado con ${result.model.recordsCount} registros (${result.model.minDate} a ${result.model.maxDate}). Error histórico MAE: ${result.model.maeBacktestDays} días.`;
+    `Modelo entrenado con ${result.model.recordsCount} registros (${result.model.minDate} a ${result.model.maxDate}). Error histórico MAE: ${result.model.maeBacktestDays} días hábiles.`;
 
   nutForecastResult.classList.remove("hidden");
 }

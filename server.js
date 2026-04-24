@@ -2060,6 +2060,7 @@ app.get("/api/nut-forecast", withRateLimit("nut-forecast", RATE_LIMIT_CONFIG.nut
       p80AbsErrorDays: modelBundle.metadata.p80AbsErrorDays,
       p95AbsErrorDays: modelBundle.metadata.p95AbsErrorDays,
       estimatedRecentVelocityNutPerDay: modelBundle.metadata.estimatedRecentVelocityNutPerDay,
+      estimatedRecentVelocityNutPerBusinessDay: modelBundle.metadata.estimatedRecentVelocityNutPerBusinessDay,
       loadedAt: modelBundle.metadata.loadedAt,
     },
   });

@@ -67,7 +67,7 @@ class NutProjectionModel:
         max_date = max(r.appointment_date for r in ordered_by_nut)
 
         xs = [r.nut for r in ordered_by_nut]
-        ys = [(r.appointment_date - min_date).days for r in ordered_by_nut]
+        ys = [business_days_between(min_date, r.appointment_date) for r in ordered_by_nut]
 
         slope = theil_sen_slope(xs, ys)
         intercept = statistics.median(y - slope * x for x, y in zip(xs, ys))
@@ -116,8 +116,7 @@ class NutProjectionModel:
 
     def predict_date(self, nut: int) -> date:
         predicted_day = self.predict_day_index(nut)
-        raw = self.min_date + timedelta(days=max(0, int(round(predicted_day))))
-        return move_to_next_weekday(raw)
+        return add_business_days(self.min_date, max(0, int(round(predicted_day))))
 
     def prediction_window(self, nut: int, level: float = 0.8) -> Tuple[date, date]:
         center = self.predict_day_index(nut)
@@ -126,8 +125,8 @@ class NutProjectionModel:
         low_day = max(0, int(math.floor(center - spread)))
         high_day = max(0, int(math.ceil(center + spread)))
 
-        low = move_to_next_weekday(self.min_date + timedelta(days=low_day))
-        high = move_to_next_weekday(self.min_date + timedelta(days=high_day))
+        low = add_business_days(self.min_date, low_day)
+        high = add_business_days(self.min_date, high_day)
         return low, high
 
     def _predict_with_local(self, nut: int) -> float:
@@ -253,7 +252,7 @@ def compute_recent_slope(records: Sequence[AssignmentRecord]) -> float:
 
     daily_slopes: List[float] = []
     for (d1, n1), (d2, n2) in zip(recent[:-1], recent[1:]):
-        day_gap = (d2 - d1).days
+        day_gap = business_days_between(d1, d2)
         nut_gap = n2 - n1
         if day_gap <= 0 or nut_gap <= 0:
             continue
@@ -287,7 +286,7 @@ def rolling_backtest_errors(
 
         model = NutProjectionModel.fit(train, calibrate_uncertainty=False)
         for rec in test:
-            expected = (rec.appointment_date - min_date_reference).days
+            expected = business_days_between(min_date_reference, rec.appointment_date)
             predicted = model.predict_day_index(rec.nut)
             abs_errors.append(abs(expected - predicted))
 
@@ -334,6 +333,48 @@ def move_to_next_weekday(value: date) -> date:
     while value.weekday() >= 5:
         value += timedelta(days=1)
     return value
+
+
+def move_to_previous_weekday(value: date) -> date:
+    while value.weekday() >= 5:
+        value -= timedelta(days=1)
+    return value
+
+
+def add_business_days(value: date, business_days: int) -> date:
+    remaining = int(business_days)
+    if remaining == 0:
+        return move_to_next_weekday(value)
+
+    cursor = move_to_next_weekday(value) if remaining > 0 else move_to_previous_weekday(value)
+    step = 1 if remaining > 0 else -1
+
+    while remaining != 0:
+        cursor += timedelta(days=step)
+        if cursor.weekday() < 5:
+            remaining -= step
+
+    return cursor
+
+
+def business_days_between(start: date, end: date) -> int:
+    if start == end:
+        return 0
+    if start > end:
+        return -business_days_between(end, start)
+
+    delta_days = (end - start).days
+    full_weeks = delta_days // 7
+    remainder = delta_days % 7
+    business_days = full_weeks * 5
+    start_weekday = start.weekday()
+
+    for offset in range(1, remainder + 1):
+        weekday = (start_weekday + offset) % 7
+        if weekday < 5:
+            business_days += 1
+
+    return business_days
 
 
 def export_csv(records: Sequence[AssignmentRecord], out_path: Path) -> None:
@@ -397,7 +438,7 @@ def main() -> None:
         )
         print(
             "Velocidad estimada reciente: "
-            f"{(1.0 / model.recent_slope_days_per_nut):.0f} NUT/dia (aprox.)"
+            f"{(1.0 / model.recent_slope_days_per_nut):.0f} NUT/dia habil (aprox.)"
         )
 
     if args.nut is not None:
@@ -409,7 +450,7 @@ def main() -> None:
         print(f"\nNUT consultado: {nut_value}")
         if nut_value in set(model.xs):
             known_day_idx = model.xs.index(nut_value)
-            known_date = model.min_date + timedelta(days=int(round(model.ys[known_day_idx])))
+            known_date = add_business_days(model.min_date, int(round(model.ys[known_day_idx])))
             print(f"Este NUT ya aparece en el historico con fecha: {known_date.isoformat()}")
         else:
             print(f"Fecha probable de asignacion: {prediction.isoformat()}")
