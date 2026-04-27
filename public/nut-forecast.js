@@ -42,18 +42,21 @@ function formatIsoDateLong(value) {
 }
 
 function renderNutForecastResult(result) {
-  nutForecastMain.textContent = `Fecha probable: ${formatIsoDateLong(result.probableDate)}.`;
-
   if (result.known) {
+    nutForecastMain.textContent = `Fecha oficial asignada: ${formatIsoDateLong(result.knownDate)}.`;
     nutForecastKnown.textContent = `Tu NUT ya aparece en el histórico con fecha: ${formatIsoDateLong(result.knownDate)}.`;
+    nutForecastWindow80.textContent = "Ventana probable 80%: no aplica porque este NUT ya tiene fecha asignada.";
+    nutForecastWindow95.textContent = "Ventana probable 95%: no aplica porque este NUT ya tiene fecha asignada.";
   } else {
-    nutForecastKnown.textContent = "Tu NUT no aparece aún en el histórico cargado.";
+    nutForecastMain.textContent =
+      `Rango probable principal (80%): ${formatIsoDateLong(result.window80.from)} a ${formatIsoDateLong(result.window80.to)}.`;
+    nutForecastKnown.textContent =
+      `Fecha central estimada: ${formatIsoDateLong(result.probableDate)}. Tu NUT no aparece aún en el histórico cargado.`;
+    nutForecastWindow80.textContent =
+      `Ventana probable 80%: ${formatIsoDateLong(result.window80.from)} a ${formatIsoDateLong(result.window80.to)}.`;
+    nutForecastWindow95.textContent =
+      `Ventana probable 95%: ${formatIsoDateLong(result.window95.from)} a ${formatIsoDateLong(result.window95.to)}.`;
   }
-
-  nutForecastWindow80.textContent =
-    `Ventana probable 80%: ${formatIsoDateLong(result.window80.from)} a ${formatIsoDateLong(result.window80.to)}.`;
-  nutForecastWindow95.textContent =
-    `Ventana probable 95%: ${formatIsoDateLong(result.window95.from)} a ${formatIsoDateLong(result.window95.to)}.`;
 
   const confidenceLabel = String(result.confidence || "").replace("-", " ");
   nutForecastConfidence.textContent = `Nivel de confianza del cálculo: ${confidenceLabel}.`;
