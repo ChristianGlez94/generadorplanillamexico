@@ -32,12 +32,96 @@ body {
     linear-gradient(140deg, var(--paper), var(--paper-soft));
 }
 
+body.consent-locked {
+  overflow: hidden;
+}
+
 .background-glow {
   position: fixed;
   inset: 0;
   pointer-events: none;
   background-image: linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.32) 40%, transparent 70%);
   opacity: 0.6;
+}
+
+.consent-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  padding: 1rem;
+  display: grid;
+  place-items: center;
+  background: rgba(22, 16, 11, 0.68);
+  backdrop-filter: blur(3px);
+}
+
+.consent-card {
+  width: min(620px, 96vw);
+  background: #fffaf1;
+  border: 1px solid #d6c6b3;
+  border-radius: 14px;
+  box-shadow: 0 24px 44px rgba(29, 19, 12, 0.32);
+  padding: 1.1rem 1rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.consent-eyebrow {
+  margin: 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #7a6b5d;
+  font-weight: 700;
+}
+
+.consent-card h2 {
+  margin: 0;
+  font-family: "Libre Baskerville", Georgia, serif;
+  color: var(--primary);
+  font-size: clamp(1.12rem, 2.7vw, 1.35rem);
+}
+
+.consent-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.consent-card a {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.consent-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.58rem;
+  font-weight: 600;
+  color: #5c5248;
+}
+
+.consent-option input[type="checkbox"] {
+  width: 1.05rem;
+  height: 1.05rem;
+  margin: 0.15rem 0 0;
+  padding: 0;
+  border: 1px solid #bfae98;
+  border-radius: 4px;
+  background: #fffefa;
+  box-shadow: none;
+  transform: none;
+}
+
+.consent-option input[type="checkbox"]:focus {
+  outline: 2px solid rgba(10, 108, 87, 0.35);
+  outline-offset: 1px;
+}
+
+.consent-note {
+  font-size: 0.86rem;
+  color: #7a6f61;
 }
 
 .layout {
