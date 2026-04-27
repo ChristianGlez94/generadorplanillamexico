@@ -44,6 +44,7 @@ class NutProjectionModel:
     max_date: date
     xs: List[int]
     ys: List[float]
+    max_observed_day_index: float
     slope_days_per_nut: float
     intercept_days: float
     residuals: List[float]
@@ -86,6 +87,7 @@ class NutProjectionModel:
             max_date=max_date,
             xs=xs,
             ys=ys,
+            max_observed_day_index=max(ys),
             slope_days_per_nut=slope,
             intercept_days=intercept,
             residuals=residuals,
@@ -99,13 +101,15 @@ class NutProjectionModel:
     def predict_day_index(self, nut: int) -> float:
         x_min = self.xs[0]
         x_max = self.xs[-1]
+        min_forward_day = self.max_observed_day_index + 1
 
         if nut > x_max:
             edge_day = self._predict_with_local(x_max)
             delta_nut = nut - x_max
             # Blend long-term and recent velocity for better forward projection.
             blended_slope = 0.35 * self.slope_days_per_nut + 0.65 * self.recent_slope_days_per_nut
-            return edge_day + delta_nut * blended_slope
+            # A NUT above the observed max should not project to an already assigned date.
+            return max(edge_day + delta_nut * blended_slope, min_forward_day)
 
         if nut < x_min:
             edge_day = self._predict_with_local(x_min)
@@ -116,7 +120,11 @@ class NutProjectionModel:
 
     def predict_date(self, nut: int) -> date:
         predicted_day = self.predict_day_index(nut)
-        return add_business_days(self.min_date, max(0, int(round(predicted_day))))
+        if nut > self.xs[-1]:
+            predicted_index = max(self.max_observed_day_index + 1, math.ceil(predicted_day))
+        else:
+            predicted_index = max(0, int(round(predicted_day)))
+        return add_business_days(self.min_date, int(predicted_index))
 
     def prediction_window(self, nut: int, level: float = 0.8) -> Tuple[date, date]:
         center = self.predict_day_index(nut)
@@ -124,6 +132,10 @@ class NutProjectionModel:
 
         low_day = max(0, int(math.floor(center - spread)))
         high_day = max(0, int(math.ceil(center + spread)))
+        if nut > self.xs[-1]:
+            min_forward_day = int(self.max_observed_day_index + 1)
+            low_day = max(low_day, min_forward_day)
+            high_day = max(high_day, low_day)
 
         low = add_business_days(self.min_date, low_day)
         high = add_business_days(self.min_date, high_day)

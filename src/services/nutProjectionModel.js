@@ -280,6 +280,7 @@ function buildModelCore(records, options = {}) {
     maxDate,
     xs,
     ys,
+    maxObservedDayIndex: Math.max(...ys),
     slopeDaysPerNut: slope,
     interceptDays: intercept,
     residuals,
@@ -369,12 +370,14 @@ function predictWithLocal(model, nutValue) {
 function predictDayIndex(model, nutValue) {
   const xMin = model.xs[0];
   const xMax = model.xs[model.xs.length - 1];
+  const minForwardDay = model.maxObservedDayIndex + 1;
 
   if (nutValue > xMax) {
     const edgeDay = predictWithLocal(model, xMax);
     const deltaNut = nutValue - xMax;
     const blendedSlope = 0.35 * model.slopeDaysPerNut + 0.65 * model.recentSlopeDaysPerNut;
-    return edgeDay + deltaNut * blendedSlope;
+    // Un NUT mayor al maximo historico no puede proyectarse en una fecha ya asignada.
+    return Math.max(edgeDay + deltaNut * blendedSlope, minForwardDay);
   }
 
   if (nutValue < xMin) {
@@ -387,15 +390,27 @@ function predictDayIndex(model, nutValue) {
 }
 
 function predictDate(model, nutValue) {
-  const predictedDay = Math.max(0, Math.round(predictDayIndex(model, nutValue)));
+  const xMax = model.xs[model.xs.length - 1];
+  const rawPrediction = predictDayIndex(model, nutValue);
+  const predictedDay = nutValue > xMax
+    ? Math.max(model.maxObservedDayIndex + 1, Math.ceil(rawPrediction))
+    : Math.max(0, Math.round(rawPrediction));
   return addBusinessDays(model.minDate, predictedDay);
 }
 
 function predictionWindow(model, nutValue, level = 0.8) {
+  const xMax = model.xs[model.xs.length - 1];
   const center = predictDayIndex(model, nutValue);
   const spread = level <= 0.8 ? model.p80AbsErrorDays : model.p95AbsErrorDays;
-  const lowDay = Math.max(0, Math.floor(center - spread));
-  const highDay = Math.max(0, Math.ceil(center + spread));
+  const minForwardDay = model.maxObservedDayIndex + 1;
+  let lowDay = Math.max(0, Math.floor(center - spread));
+  let highDay = Math.max(0, Math.ceil(center + spread));
+
+  if (nutValue > xMax) {
+    lowDay = Math.max(lowDay, minForwardDay);
+    highDay = Math.max(highDay, lowDay);
+  }
+
   const low = addBusinessDays(model.minDate, lowDay);
   const high = addBusinessDays(model.minDate, highDay);
 
