@@ -458,6 +458,10 @@ small {
   font-weight: 700;
 }
 
+.nut-forecast-disclaimer {
+  margin-top: 0.55rem;
+}
+
 .site-footer {
   margin-top: 1.1rem;
   background: rgba(255, 251, 243, 0.94);
