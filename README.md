@@ -85,7 +85,7 @@ Abrir en navegador: [http://localhost:3000](http://localhost:3000)
 - `REPORTER_SESSION_SECRET`: clave para firmar cookies de sesion (en produccion debe tener al menos 32 caracteres).
 - `REPORTER_PORTAL_PATH`: ruta privada del panel interno (ejemplo: `/mi-panel-interno-2026`).
 - `BLOG_STORAGE_DIR`: ruta persistente para guardar `blog-posts.json` y `uploads/` (recomendado en Render: `/var/data`).
-- `SITE_BASE_URL`: URL publica base del sitio para generar `robots.txt` y `sitemap.xml` con dominio canonico (ejemplo: `https://tu-dominio.com`).
+- `SITE_BASE_URL`: URL publica base del sitio para generar `robots.txt`, `sitemap.xml`, etiquetas canónicas y redirección 301 al dominio/protocolo canónico (ejemplo: `https://tu-dominio.com`).
 - `ALLOWED_ORIGINS`: lista separada por comas de origenes autorizados para CORS (ejemplo: `https://tu-dominio.com,https://www.tu-dominio.com`).
 - `RECAPTCHA_SITE_KEY`: clave publica de Google reCAPTCHA v3 (se usa en frontend).
 - `RECAPTCHA_SECRET_KEY`: clave secreta de Google reCAPTCHA v3 (solo backend).
@@ -107,6 +107,7 @@ Con esto, los despliegues o reinicios no eliminan noticias ni imagenes subidas d
 
 - `GET /sitemap.xml`: sitemap dinamico con paginas publicas y noticias del blog.
 - `GET /robots.txt`: habilita rastreo publico, bloquea rutas internas y publica la ruta del sitemap.
+- Si `SITE_BASE_URL` esta configurada, el servidor redirige (`301`) cualquier variante no canónica (`http`, `www`, host alterno) a la URL canónica.
 - Recomendacion: registrar `https://tu-dominio.com/sitemap.xml` en Google Search Console.
 
 ## Seguridad aplicada

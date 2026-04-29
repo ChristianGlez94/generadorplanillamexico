@@ -138,6 +138,22 @@ app.use((req, res, next) => {
   next();
 });
 app.use((req, res, next) => {
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    return next();
+  }
+
+  if (req.path === "/health") {
+    return next();
+  }
+
+  const redirectHref = buildCanonicalSiteRedirectHref(req);
+  if (!redirectHref) {
+    return next();
+  }
+
+  return res.redirect(301, redirectHref);
+});
+app.use((req, res, next) => {
   const origin = String(req.headers.origin || "").trim();
 
   if (!origin) {
@@ -530,10 +546,7 @@ function normalizeBaseUrl(rawUrl) {
   }
 }
 
-function resolveBaseUrl(req) {
-  const configured = normalizeBaseUrl(SITE_BASE_URL);
-  if (configured) return configured;
-
+function resolveRequestBaseUrl(req) {
   const forwardedProto = String(req.headers["x-forwarded-proto"] || "")
     .split(",")[0]
     .trim();
@@ -543,7 +556,29 @@ function resolveBaseUrl(req) {
 
   const protocol = forwardedProto || req.protocol || "https";
   const host = forwardedHost || req.get("host") || "localhost";
-  return `${protocol}://${host}`;
+  return normalizeBaseUrl(`${protocol}://${host}`);
+}
+
+function resolveBaseUrl(req) {
+  const configured = normalizeBaseUrl(SITE_BASE_URL);
+  if (configured) return configured;
+  return resolveRequestBaseUrl(req);
+}
+
+function buildCanonicalSiteRedirectHref(req) {
+  const canonicalBaseUrl = normalizeBaseUrl(SITE_BASE_URL);
+  if (!canonicalBaseUrl) return "";
+
+  const requestBaseUrl = resolveRequestBaseUrl(req);
+  if (!requestBaseUrl) return "";
+
+  if (requestBaseUrl.toLowerCase() === canonicalBaseUrl.toLowerCase()) {
+    return "";
+  }
+
+  const originalPath = String(req.originalUrl || req.url || "").trim();
+  const safePath = originalPath.startsWith("/") ? originalPath : `/${originalPath}`;
+  return `${canonicalBaseUrl}${safePath || "/"}`;
 }
 
 function isWeakReporterSecret(secret) {

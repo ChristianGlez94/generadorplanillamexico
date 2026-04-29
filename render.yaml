@@ -17,5 +17,9 @@ services:
         value: production
       - key: TZ
         value: America/Tijuana
+      - key: SITE_BASE_URL
+        value: https://planillavisamexico.com
+      - key: ALLOWED_ORIGINS
+        value: https://planillavisamexico.com,https://www.planillavisamexico.com
       - key: BLOG_STORAGE_DIR
         value: /var/data
