@@ -50,6 +50,9 @@ const ALLOWED_ORIGINS = parseAllowedOrigins(String(process.env.ALLOWED_ORIGINS |
 const RECAPTCHA_SITE_KEY = String(process.env.RECAPTCHA_SITE_KEY || "").trim();
 const RECAPTCHA_SECRET_KEY = String(process.env.RECAPTCHA_SECRET_KEY || "").trim();
 const RECAPTCHA_ACTION = String(process.env.RECAPTCHA_ACTION || "generate_visa_pdf").trim() || "generate_visa_pdf";
+const RECAPTCHA_ACTION_NUT_FORECAST = String(
+  process.env.RECAPTCHA_ACTION_NUT_FORECAST || RECAPTCHA_ACTION
+).trim() || RECAPTCHA_ACTION;
 const RECAPTCHA_MIN_SCORE = parseRecaptchaMinScore(process.env.RECAPTCHA_MIN_SCORE);
 const RECAPTCHA_ENABLED = Boolean(RECAPTCHA_SITE_KEY && RECAPTCHA_SECRET_KEY);
 const NUT_MODEL_CSV_PATH = String(
@@ -130,7 +133,9 @@ if (RECAPTCHA_SITE_KEY && !RECAPTCHA_SECRET_KEY) {
 } else if (!RECAPTCHA_SITE_KEY && RECAPTCHA_SECRET_KEY) {
   console.warn("[security] RECAPTCHA_SECRET_KEY configurada, pero RECAPTCHA_SITE_KEY está ausente.");
 } else if (!RECAPTCHA_ENABLED) {
-  console.warn("[security] reCAPTCHA V3 no está configurado. La generación de PDF será bloqueada.");
+  console.warn(
+    "[security] reCAPTCHA V3 no está configurado. La generación de PDF y el estimador NUT serán bloqueados."
+  );
 }
 
 app.use((req, res, next) => {
@@ -442,7 +447,7 @@ async function postFormUrlEncoded(url, payload) {
   });
 }
 
-async function verifyRecaptchaV3Token(token, remoteIp) {
+async function verifyRecaptchaV3Token(token, remoteIp, expectedAction = RECAPTCHA_ACTION) {
   if (!RECAPTCHA_ENABLED) {
     return {
       ok: false,
@@ -492,9 +497,10 @@ async function verifyRecaptchaV3Token(token, remoteIp) {
     }
 
     const action = String(body.action || "");
+    const expectedActionNormalized = String(expectedAction || "").trim();
     const score = Number(body.score);
     const scoreIsValid = Number.isFinite(score) && score >= RECAPTCHA_MIN_SCORE;
-    const actionIsValid = action === RECAPTCHA_ACTION;
+    const actionIsValid = Boolean(expectedActionNormalized) && action === expectedActionNormalized;
     const success = body.success === true;
 
     return {
@@ -2054,25 +2060,66 @@ app.get("/api/countries", (_req, res) => {
   });
 });
 
-app.get("/api/recaptcha-config", (_req, res) => {
+app.get("/api/recaptcha-config", (req, res) => {
   if (!RECAPTCHA_SITE_KEY) {
     return res.status(503).json({
       message: "reCAPTCHA no está configurado en el servidor.",
     });
   }
 
+  const context = String(getSingleQueryValue(req.query.context) || "")
+    .trim()
+    .toLowerCase();
+  const action = context === "nut_forecast" ? RECAPTCHA_ACTION_NUT_FORECAST : RECAPTCHA_ACTION;
+
   return res.json({
     siteKey: RECAPTCHA_SITE_KEY,
-    action: RECAPTCHA_ACTION,
+    action,
   });
 });
 
 app.get("/api/nut-forecast", withRateLimit("nut-forecast", RATE_LIMIT_CONFIG.nutForecast), async (req, res) => {
+  if (!RECAPTCHA_ENABLED) {
+    return res.status(503).json({
+      message: "Protección anti-bots no disponible temporalmente. Inténtalo más tarde.",
+    });
+  }
+
   const nutValue = parseNutNumber(getSingleQueryValue(req.query.nut));
   if (nutValue === null) {
     return res.status(400).json({
       message: "Debes indicar un NUT válido de 7 dígitos en el parámetro nut.",
     });
+  }
+
+  const recaptchaToken = String(getSingleQueryValue(req.query.recaptchaToken) || "").trim();
+  const recaptchaCheck = await verifyRecaptchaV3Token(
+    recaptchaToken,
+    getClientIp(req),
+    RECAPTCHA_ACTION_NUT_FORECAST
+  );
+
+  if (!recaptchaCheck.ok) {
+    const recaptchaErrors = Array.isArray(recaptchaCheck.body?.["error-codes"])
+      ? recaptchaCheck.body["error-codes"].join(",")
+      : "none";
+    console.warn(
+      `[security] Solicitud bloqueada por reCAPTCHA. endpoint=nut-forecast reason=${recaptchaCheck.reason} action=${String(recaptchaCheck.body?.action || "n/a")} score=${String(recaptchaCheck.body?.score || "n/a")} errors=${recaptchaErrors}`
+    );
+    let statusCode = 403;
+    let message = "No se pudo validar la solicitud. Inténtalo de nuevo.";
+
+    if (recaptchaCheck.reason === "missing_token") {
+      statusCode = 400;
+      message = "No se recibió validación anti-bots. Recarga la página e inténtalo nuevamente.";
+    }
+
+    if (["request_failed", "google_http_error", "invalid_json"].includes(recaptchaCheck.reason)) {
+      statusCode = 503;
+      message = "No se pudo validar protección anti-bots temporalmente. Inténtalo en unos minutos.";
+    }
+
+    return res.status(statusCode).json({ message });
   }
 
   const modelBundle = await ensureNutProjectionModelLoaded();
@@ -2515,7 +2562,7 @@ app.post("/api/generate-visa-pdf", withRateLimit("visa-pdf", RATE_LIMIT_CONFIG.g
 
   const rawBody = req.body && typeof req.body === "object" ? req.body : {};
   const recaptchaToken = String(rawBody.recaptchaToken || "").trim();
-  const recaptchaCheck = await verifyRecaptchaV3Token(recaptchaToken, getClientIp(req));
+  const recaptchaCheck = await verifyRecaptchaV3Token(recaptchaToken, getClientIp(req), RECAPTCHA_ACTION);
 
   if (!recaptchaCheck.ok) {
     const recaptchaErrors = Array.isArray(recaptchaCheck.body?.["error-codes"])

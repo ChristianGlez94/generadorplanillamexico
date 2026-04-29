@@ -8,6 +8,9 @@ const nutForecastWindow80 = document.getElementById("nutForecastWindow80");
 const nutForecastWindow95 = document.getElementById("nutForecastWindow95");
 const nutForecastConfidence = document.getElementById("nutForecastConfidence");
 const nutForecastMeta = document.getElementById("nutForecastMeta");
+const RECAPTCHA_SCRIPT_URL = "https://www.google.com/recaptcha/api.js";
+let recaptchaConfigPromise = null;
+let recaptchaScriptPromise = null;
 
 function setNutForecastStatus(message, tone = "") {
   nutForecastStatus.textContent = message;
@@ -20,6 +23,102 @@ function setNutForecastStatus(message, tone = "") {
 
 function normalizeNutInput(rawValue) {
   return String(rawValue || "").replace(/\D/g, "").slice(0, 7);
+}
+
+async function loadRecaptchaConfig() {
+  if (!recaptchaConfigPromise) {
+    recaptchaConfigPromise = fetch("/api/recaptcha-config?context=nut_forecast", {
+      headers: {
+        Accept: "application/json",
+      },
+    })
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.message || "No se pudo inicializar la protección anti-bots.");
+        }
+
+        const siteKey = String(data.siteKey || "").trim();
+        const action = String(data.action || "nut_forecast_lookup").trim() || "nut_forecast_lookup";
+
+        if (!siteKey) {
+          throw new Error("No se recibió la clave pública de reCAPTCHA.");
+        }
+
+        return { siteKey, action };
+      })
+      .catch((error) => {
+        recaptchaConfigPromise = null;
+        throw error;
+      });
+  }
+
+  return recaptchaConfigPromise;
+}
+
+async function loadRecaptchaScript(siteKey) {
+  if (window.grecaptcha && typeof window.grecaptcha.ready === "function") {
+    return window.grecaptcha;
+  }
+
+  if (!recaptchaScriptPromise) {
+    recaptchaScriptPromise = new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = `${RECAPTCHA_SCRIPT_URL}?render=${encodeURIComponent(siteKey)}`;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        if (window.grecaptcha && typeof window.grecaptcha.ready === "function") {
+          resolve(window.grecaptcha);
+          return;
+        }
+
+        reject(new Error("reCAPTCHA no se cargó correctamente."));
+      };
+      script.onerror = () => {
+        reject(new Error("No se pudo cargar reCAPTCHA. Revisa tu conexión e inténtalo de nuevo."));
+      };
+      document.head.appendChild(script);
+    }).catch((error) => {
+      recaptchaScriptPromise = null;
+      throw error;
+    });
+  }
+
+  return recaptchaScriptPromise;
+}
+
+async function createRecaptchaToken() {
+  const config = await loadRecaptchaConfig();
+  const grecaptcha = await loadRecaptchaScript(config.siteKey);
+
+  return new Promise((resolve, reject) => {
+    grecaptcha.ready(() => {
+      grecaptcha
+        .execute(config.siteKey, { action: config.action })
+        .then((token) => {
+          const cleanToken = String(token || "").trim();
+          if (!cleanToken) {
+            reject(new Error("No se pudo validar reCAPTCHA."));
+            return;
+          }
+
+          resolve(cleanToken);
+        })
+        .catch(() => {
+          reject(new Error("No se pudo validar reCAPTCHA. Inténtalo nuevamente."));
+        });
+    });
+  });
+}
+
+async function preloadRecaptcha() {
+  try {
+    const config = await loadRecaptchaConfig();
+    await loadRecaptchaScript(config.siteKey);
+  } catch (_error) {
+    // El error se mostrará al usuario cuando intente calcular la proyección.
+  }
 }
 
 function formatIsoDateLong(value) {
@@ -78,10 +177,12 @@ async function calculateNutForecast() {
   }
 
   nutForecastBtn.disabled = true;
-  setNutForecastStatus("Calculando proyección NUT...");
+  setNutForecastStatus("Validando seguridad y calculando proyección NUT...");
 
   try {
-    const response = await fetch(`/api/nut-forecast?nut=${encodeURIComponent(nutValue)}`, {
+    const recaptchaToken = await createRecaptchaToken();
+    const endpoint = `/api/nut-forecast?nut=${encodeURIComponent(nutValue)}&recaptchaToken=${encodeURIComponent(recaptchaToken)}`;
+    const response = await fetch(endpoint, {
       headers: {
         Accept: "application/json",
       },
@@ -115,3 +216,4 @@ nutForecastInput.addEventListener("keydown", (event) => {
 });
 
 nutForecastBtn.addEventListener("click", calculateNutForecast);
+preloadRecaptcha();

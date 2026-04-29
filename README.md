@@ -45,11 +45,12 @@ Abrir en navegador: [http://localhost:3000](http://localhost:3000)
 3. El backend valida el token anti-bots y todos los datos del formulario.
 4. Se genera el PDF final con letra profesional y marcas `X`.
 5. Se descarga automaticamente el archivo listo para imprimir.
+6. En el estimador NUT, el frontend tambien genera token `reCAPTCHA v3` antes de llamar la API de proyeccion.
 
 ## Estimador NUT integrado
 
 - La interfaz independiente del estimador esta en `/estimador-nut.html`.
-- API usada por la web: `GET /api/nut-forecast?nut=7449000`
+- API usada por la web: `GET /api/nut-forecast?nut=7449000&recaptchaToken=...`
 - El modelo usa regresion robusta + ajuste local y entrega:
   - fecha probable,
   - ventana probable 80% (en dias habiles),
@@ -90,6 +91,7 @@ Abrir en navegador: [http://localhost:3000](http://localhost:3000)
 - `RECAPTCHA_SITE_KEY`: clave publica de Google reCAPTCHA v3 (se usa en frontend).
 - `RECAPTCHA_SECRET_KEY`: clave secreta de Google reCAPTCHA v3 (solo backend).
 - `RECAPTCHA_ACTION`: accion esperada para validar el token (por defecto: `generate_visa_pdf`).
+- `RECAPTCHA_ACTION_NUT_FORECAST`: accion esperada para validar tokens del estimador NUT (por defecto: hereda `RECAPTCHA_ACTION`; recomendado: `nut_forecast_lookup`).
 - `RECAPTCHA_MIN_SCORE`: puntaje minimo aceptado entre `0` y `1` (por defecto recomendado: `0.5`).
 - `NUT_MODEL_CSV_PATH`: opcional. Ruta al CSV historico de NUT (por defecto: `model-nut/nut_assignments.csv` dentro del proyecto).
 
@@ -114,7 +116,7 @@ Con esto, los despliegues o reinicios no eliminan noticias ni imagenes subidas d
 
 - Cookies de sesion de reportero con `HttpOnly`, `Secure` (en produccion) y `SameSite=Strict`.
 - Rate limiting en login de reportero, escritura de noticias y generacion de PDF.
-- Validacion obligatoria de `reCAPTCHA v3` para generar PDF (token, accion y score minimo).
+- Validacion obligatoria de `reCAPTCHA v3` para generar PDF y para consultar el estimador NUT (token, accion y score minimo).
 - Validacion de imagen por firma binaria real (no solo por extension o MIME declarado).
 - Headers base de seguridad (`nosniff`, `DENY`, `Referrer-Policy`, `Permissions-Policy`).
 
