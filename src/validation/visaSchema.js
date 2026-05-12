@@ -2,6 +2,7 @@ const { z } = require("zod");
 
 const yesNoEnum = z.enum(["SI", "NO"]);
 const tipoVisaEnum = z.enum([
+  "NO_MARCAR",
   "VISITANTE_SIN_PERMISO",
   "VISITANTE_SIN_PERMISO_LARGA_DURACION",
   "VISITANTE_CON_PERMISO",
@@ -13,7 +14,7 @@ const tipoVisaEnum = z.enum([
   "OFICIAL",
   "SERVICIO",
 ]);
-const tipoPasaporteEnum = z.enum(["ORDINARIO", "NO_ORDINARIO", "LAISSEZ_PASSER"]);
+const tipoPasaporteEnum = z.enum(["NO_MARCAR", "ORDINARIO", "NO_ORDINARIO", "LAISSEZ_PASSER"]);
 
 const nonEmpty = z
   .string()

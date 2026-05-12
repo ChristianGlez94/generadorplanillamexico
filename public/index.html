@@ -231,10 +231,14 @@
             <label>
               9. Tipo de pasaporte
               <select name="tipoPasaporte" required>
+                <option value="NO_MARCAR" selected>No marcar (dejar para uso oficial)</option>
                 <option value="ORDINARIO">Ordinario</option>
                 <option value="NO_ORDINARIO">No ordinario</option>
                 <option value="LAISSEZ_PASSER">Laissez-Passer</option>
               </select>
+              <small>
+                Algunos consulados prefieren completar este campo durante la entrevista.
+              </small>
             </label>
             <label>
               País de expedición
@@ -355,6 +359,7 @@
             <label>
               20. Tipo de visa
               <select name="tipoVisa" required>
+                <option value="NO_MARCAR" selected>No marcar (dejar para uso oficial)</option>
                 <option value="VISITANTE_SIN_PERMISO">
                   Visitante sin permiso para actividades remuneradas
                 </option>
@@ -372,6 +377,9 @@
                 <option value="OFICIAL">Oficial</option>
                 <option value="SERVICIO">Servicio</option>
               </select>
+              <small>
+                Algunos consulados prefieren completar este campo durante la entrevista.
+              </small>
             </label>
             <label>
               21. Fecha de ingreso a México
