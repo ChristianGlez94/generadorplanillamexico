@@ -339,7 +339,8 @@ async function fillVisaPdf(formData) {
     clamp: true,
   });
 
-  drawMark(page1, helveticaBold, layout.page1.tipoVisaMarks[formData.tipoVisa]);
+  // Uso oficial: el solicitante no debe marcar "Tipo de visa" en la planilla.
+  // drawMark(page1, helveticaBold, layout.page1.tipoVisaMarks[formData.tipoVisa]);
 
   drawDateParts(page1, helvetica, formData.fechaIngresoMexico, layout.page1.fechaIngresoPartes);
   drawTextInRect(page1, helvetica, toUpper(formData.ciudadIngreso), layout.page1.ciudadIngreso, {
@@ -363,7 +364,8 @@ async function fillVisaPdf(formData) {
     clamp: true,
   });
 
-  drawMark(page1, helveticaBold, layout.page1.tipoPasaporteMarks[formData.tipoPasaporte]);
+  // Uso oficial: el solicitante no debe marcar "Tipo de pasaporte" en la planilla.
+  // drawMark(page1, helveticaBold, layout.page1.tipoPasaporteMarks[formData.tipoPasaporte]);
 
   const docs = Array.from({ length: 5 }, (_, idx) => toUpper(formData.documentosAdjuntos[idx] || ""));
   docs.forEach((line, idx) => {
