@@ -8,6 +8,26 @@ function normalizePathname(pathname) {
 const CONSENT_STORAGE_KEY = "site_legal_consent_v1";
 const CONSENT_VERSION = "2026-04-27";
 const CONSENT_EXEMPT_PATHS = new Set(["/terminos-condiciones.html", "/politica-privacidad.html"]);
+const PRIMARY_NAV_LINKS = [
+  { href: "/", label: "Blog" },
+  { href: "/herramienta.html", label: "Herramienta" },
+  { href: "/estimador-nut.html", label: "Estimador NUT" },
+  { href: "/noticias-nut.html", label: "Noticias NUT" },
+  { href: "/contacto.html", label: "Contacto" },
+];
+const FOOTER_NAV_LINKS = [
+  ...PRIMARY_NAV_LINKS,
+  { href: "/sobre-esta-herramienta.html", label: "Sobre el sitio" },
+  { href: "/politica-privacidad.html", label: "Privacidad" },
+  { href: "/terminos-condiciones.html", label: "Términos" },
+  { href: "/aviso-responsabilidad.html", label: "Responsabilidad" },
+  { href: "/sitemap.xml", label: "Sitemap" },
+];
+const MOBILE_QUICK_NAV_LINKS = [
+  { href: "/herramienta.html", label: "Herramienta" },
+  { href: "/estimador-nut.html", label: "Estimador NUT" },
+  { href: "/noticias-nut.html", label: "Noticias NUT" },
+];
 
 function toAbsolutePath(href) {
   const raw = String(href || "").trim();
@@ -24,7 +44,7 @@ function toAbsolutePath(href) {
 function markCurrentNavigationLink() {
   const currentPath = normalizePathname(window.location.pathname);
   const currentIsBlog = currentPath === "/" || currentPath === "/blog.html";
-  const selectors = ".hero-nav a, .footer-links a";
+  const selectors = ".hero-nav a, .footer-links a, .quick-nav-mobile a";
   const links = document.querySelectorAll(selectors);
 
   links.forEach((link) => {
@@ -41,6 +61,44 @@ function markCurrentNavigationLink() {
       link.setAttribute("aria-current", "page");
     }
   });
+}
+
+function buildNavigationMarkup(links) {
+  const source = Array.isArray(links) ? links : [];
+  return source
+    .map((link) => {
+      const href = String(link?.href || "").trim();
+      const label = String(link?.label || "").trim();
+      if (!href || !label) return "";
+      return `<a href="${href}">${label}</a>`;
+    })
+    .filter(Boolean)
+    .join("");
+}
+
+function hydrateSiteNavigation() {
+  const heroNavMarkup = buildNavigationMarkup(PRIMARY_NAV_LINKS);
+  const footerNavMarkup = buildNavigationMarkup(FOOTER_NAV_LINKS);
+  const heroNavs = document.querySelectorAll(".hero-nav");
+  const footerNavs = document.querySelectorAll(".footer-links");
+
+  heroNavs.forEach((nav) => {
+    nav.innerHTML = heroNavMarkup;
+  });
+
+  footerNavs.forEach((nav) => {
+    nav.innerHTML = footerNavMarkup;
+  });
+}
+
+function initMobileQuickNav() {
+  if (document.querySelector(".quick-nav-mobile")) return;
+
+  const quickNav = document.createElement("nav");
+  quickNav.className = "quick-nav-mobile";
+  quickNav.setAttribute("aria-label", "Atajos móviles");
+  quickNav.innerHTML = buildNavigationMarkup(MOBILE_QUICK_NAV_LINKS);
+  document.body.append(quickNav);
 }
 
 function readStoredConsent() {
@@ -150,12 +208,16 @@ if (document.readyState === "loading") {
   document.addEventListener(
     "DOMContentLoaded",
     () => {
+      hydrateSiteNavigation();
+      initMobileQuickNav();
       markCurrentNavigationLink();
       initConsentGate();
     },
     { once: true }
   );
 } else {
+  hydrateSiteNavigation();
+  initMobileQuickNav();
   markCurrentNavigationLink();
   initConsentGate();
 }

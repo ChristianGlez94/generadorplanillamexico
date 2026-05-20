@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Aviso de responsabilidad</title>
+    <title>Noticias NUT | Asignaciones de citas</title>
     <link rel="icon" type="image/x-icon" href="/favicon_planilla_mexico_v2.ico" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -23,51 +23,41 @@
 
     <main class="layout legal-layout">
       <header class="hero">
-        <p class="eyebrow">Aviso importante</p>
-        <h1>Aviso de responsabilidad</h1>
+        <p class="eyebrow">Seguimiento de citas</p>
+        <h1>Noticias de asignaciones de citas NUT</h1>
         <p>
-          Lee este aviso antes de usar cualquier sección del sitio.
+          Consulta en un solo lugar las publicaciones relacionadas con asignaciones de citas NUT y
+          abre cada nota para ver el detalle completo.
         </p>
         <nav class="hero-nav" aria-label="Navegación principal del sitio">
           <a href="/">Blog</a>
           <a href="/herramienta.html">Herramienta</a>
           <a href="/estimador-nut.html">Estimador NUT</a>
-          <a href="/sobre-esta-herramienta.html">Sobre el sitio</a>
+          <a href="/noticias-nut.html">Noticias NUT</a>
           <a href="/contacto.html">Contacto</a>
-          <a href="/politica-privacidad.html">Privacidad</a>
-          <a href="/terminos-condiciones.html">Términos</a>
-          <a href="/aviso-responsabilidad.html">Responsabilidad</a>
         </nav>
       </header>
 
-      <section class="legal-card">
-        <h2>Declaración general</h2>
-        <p>
-          Esta web es un sitio de apoyo con noticias, tutoriales y herramientas digitales. No somos
-          responsables por errores derivados del uso o interpretación de su contenido.
-        </p>
+      <section class="card nut-news-panel" data-nut-news-root data-nut-news-limit="18">
+        <h2>Publicaciones recientes</h2>
+        <p class="nut-news-status" data-nut-news-status>Cargando noticias NUT...</p>
+        <div class="nut-news-list" data-nut-news-list aria-live="polite"></div>
+        <p class="nut-news-count" data-nut-news-count></p>
       </section>
 
       <section class="legal-card">
-        <h2>Verificación obligatoria por el usuario</h2>
+        <h2>Acceso rápido</h2>
         <p>
-          Es responsabilidad de cada usuario verificar nombres, fechas, números, requisitos y
-          documentos antes de presentar solicitudes, asistir a cita o usar información publicada en
-          el sitio.
+          Si ya tienes tu número, calcula una fecha probable en el
+          <a href="/estimador-nut.html">Estimador NUT</a>. Para noticias generales de trámites y
+          migración, visita el <a href="/">blog principal</a>.
         </p>
       </section>
 
-      <section class="legal-card">
-        <h2>No representación oficial</h2>
-        <p>
-          El sitio no pertenece ni representa a consulados, embajadas o autoridades migratorias.
-          Para trámites oficiales, consulta siempre fuentes gubernamentales y canales autorizados.
-          Las proyecciones o estimaciones publicadas no constituyen confirmación oficial.
-        </p>
-      </section>
       <footer class="site-footer">
         <p class="footer-note">
-          Sitio informativo y de apoyo. Verifica requisitos y actualizaciones en fuentes oficiales antes de cualquier trámite.
+          Sitio informativo y de apoyo. Verifica requisitos y actualizaciones en fuentes oficiales
+          antes de cualquier trámite.
         </p>
         <div class="footer-store">
           <p class="footer-store-label">Disponible en Android</p>
@@ -90,16 +80,14 @@
           <a href="/">Blog</a>
           <a href="/herramienta.html">Herramienta</a>
           <a href="/estimador-nut.html">Estimador NUT</a>
-          <a href="/sobre-esta-herramienta.html">Sobre el sitio</a>
+          <a href="/noticias-nut.html">Noticias NUT</a>
           <a href="/contacto.html">Contacto</a>
-          <a href="/politica-privacidad.html">Privacidad</a>
-          <a href="/terminos-condiciones.html">Términos</a>
-          <a href="/aviso-responsabilidad.html">Responsabilidad</a>
-          <a href="/sitemap.xml">Sitemap</a>
         </div>
         <p class="footer-copy">&copy; 2026 Generador Planilla México. Todos los derechos reservados.</p>
       </footer>
     </main>
+
+    <script src="/nut-news.js?v=20260520_nut_assignments_v1" defer></script>
     <script src="/site-shell.js?v=20260520_nut_nav_v1" defer></script>
   </body>
 </html>

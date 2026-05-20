@@ -86,6 +86,7 @@ const PUBLIC_SITE_PATHS = [
   "/",
   "/herramienta.html",
   "/estimador-nut.html",
+  "/noticias-nut.html",
   "/archivo-noticias.html",
   "/sobre-esta-herramienta.html",
   "/contacto.html",
@@ -848,6 +849,40 @@ function filterBlogPosts(posts, options = {}) {
     const matchesCategory = !hasCategory || postCategory === category;
     return matchesQuery && matchesCategory;
   });
+}
+
+function buildBlogSearchIndex(post) {
+  const tags = Array.isArray(post?.tags) ? post.tags.join(" ") : "";
+  const content = Array.isArray(post?.content) ? post.content.join(" ") : String(post?.content || "");
+  return normalizeSearchText([post?.title, post?.description, post?.category, tags, content].join(" "));
+}
+
+function isNutAssignmentPost(post) {
+  const text = buildBlogSearchIndex(post);
+  if (!text) return false;
+
+  const mentionsNut = /\bnut\b/.test(text);
+  const mentionsCita = /\bcita(s)?\b/.test(text);
+  const mentionsAssignment = /(asignacion|asignaciones|registro preferencial|publica asignaciones)/.test(
+    text
+  );
+
+  return mentionsNut && mentionsCita && mentionsAssignment;
+}
+
+function filterBlogPostsByTopic(posts, topic) {
+  const safePosts = Array.isArray(posts) ? posts : [];
+  const normalizedTopic = normalizeSearchText(String(topic || "").trim());
+
+  if (!normalizedTopic) {
+    return safePosts;
+  }
+
+  if (normalizedTopic === "nut_assignments" || normalizedTopic === "nut-assignments") {
+    return safePosts.filter((post) => isNutAssignmentPost(post));
+  }
+
+  return safePosts;
 }
 
 function buildSitemapXml(entries) {
@@ -2177,9 +2212,11 @@ app.get("/sitemap.xml", async (req, res) => {
           ? "0.9"
           : pathname === "/estimador-nut.html"
             ? "0.85"
-          : pathname === "/archivo-noticias.html"
-            ? "0.8"
-            : "0.7";
+            : pathname === "/noticias-nut.html"
+              ? "0.82"
+              : pathname === "/archivo-noticias.html"
+                ? "0.8"
+                : "0.7";
       const changefreq = pathname === "/" || pathname === "/herramienta.html" ? "daily" : "weekly";
 
       return {
@@ -2221,20 +2258,27 @@ app.get("/sitemap.xml", async (req, res) => {
 app.get("/api/blog-posts", async (req, res) => {
   try {
     const posts = await listBlogPosts();
-    const availableCategories = collectBlogCategories(posts);
+    const topic = String(getSingleQueryValue(req.query.topic) || "").trim();
+    const topicPosts = filterBlogPostsByTopic(posts, topic);
+    const availableCategories = collectBlogCategories(topicPosts);
     const pageRaw = getSingleQueryValue(req.query.page);
     const limitRaw = getSingleQueryValue(req.query.limit);
     const query = String(getSingleQueryValue(req.query.q) || "").trim();
     const category = String(getSingleQueryValue(req.query.category) || "").trim();
-    const shouldPaginate = pageRaw !== undefined || limitRaw !== undefined || Boolean(query) || Boolean(category);
+    const shouldPaginate =
+      pageRaw !== undefined ||
+      limitRaw !== undefined ||
+      Boolean(query) ||
+      Boolean(category) ||
+      Boolean(topic);
 
     if (!shouldPaginate) {
-      return res.json({ posts, availableCategories });
+      return res.json({ posts: topicPosts, availableCategories });
     }
 
     const page = parsePositiveInteger(pageRaw, 1);
     const limit = parsePositiveInteger(limitRaw, 15, 50);
-    const filteredPosts = filterBlogPosts(posts, { query, category });
+    const filteredPosts = filterBlogPosts(topicPosts, { query, category });
     const totalItems = filteredPosts.length;
     const totalPages = Math.max(1, Math.ceil(totalItems / limit));
     const safePage = Math.min(page, totalPages);
