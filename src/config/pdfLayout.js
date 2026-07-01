@@ -29,7 +29,7 @@ const layout = {
 
     numeroPasaporte: { x: 638, y: 708, w: 102, h: 24 },
     paisExpedicion: { x: 355, y: 741, w: 145, h: 24 },
-    fechaExpedicion: { x: 676, y: 742, w: 68, h: 22 },
+    fechaExpedicion: { x: 684, y: 742, w: 68, h: 22 },
     fechaVencimientoPartes: {
       dia: { x: 434, y: 773, w: 26, h: 24 },
       mes: { x: 530, y: 773, w: 26, h: 24 },
