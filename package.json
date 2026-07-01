@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js",
-    "generate:sample": "node scripts/generateSample.js"
+    "generate:sample": "node scripts/generateSample.js",
+    "test:nut-model": "node --test test/nutProjectionModel.test.js"
   },
   "keywords": [],
   "author": "",

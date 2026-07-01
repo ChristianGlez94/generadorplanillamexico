@@ -197,7 +197,7 @@ function getSecondSurnameTextOptions(value) {
   if (length <= 14) {
     return {
       maxSize: 6.4,
-      minSize: 5,
+      minSize: 4.6,
       clamp: true,
       baselineAdjust: BODY_TEXT_BASELINE_ADJUST,
     };
@@ -205,7 +205,7 @@ function getSecondSurnameTextOptions(value) {
 
   return {
     maxSize: 6,
-    minSize: 4.4,
+    minSize: 4.2,
     clamp: true,
     baselineAdjust: BODY_TEXT_BASELINE_ADJUST,
   };
@@ -228,7 +228,7 @@ async function fillVisaPdf(formData) {
   drawTextInRect(page1, helveticaBold, officeConsular, layout.page1.oficinaConsular, {
     align: "center",
     maxSize: 7.4,
-    minSize: 6,
+    minSize: 4.6,
     baselineAdjust: 0.6,
   });
 
@@ -240,7 +240,7 @@ async function fillVisaPdf(formData) {
   });
   drawTextInRect(page1, helveticaBold, toUpper(formData.primerApellido), layout.page1.primerApellido, {
     maxSize: 7,
-    minSize: 5.6,
+    minSize: 4.6,
     clamp: true,
     baselineAdjust: BODY_TEXT_BASELINE_ADJUST,
   });
@@ -266,23 +266,23 @@ async function fillVisaPdf(formData) {
 
   drawTextInRect(page1, helveticaBold, toUpper(formData.paisNacimiento), layout.page1.paisNacimiento, {
     maxSize: 6.8,
-    minSize: 5.6,
+    minSize: 4.6,
     clamp: true,
   });
   drawTextInRect(page1, helveticaBold, toUpper(formData.nacionalidad), layout.page1.nacionalidad, {
     maxSize: 6.8,
-    minSize: 5.2,
+    minSize: 4.4,
     clamp: true,
   });
 
   drawTextInRect(page1, helveticaBold, toUpper(formData.numeroPasaporte), layout.page1.numeroPasaporte, {
     maxSize: 7,
-    minSize: 5.6,
+    minSize: 4.4,
     clamp: true,
   });
   drawTextInRect(page1, helveticaBold, toUpper(formData.paisExpedicion), layout.page1.paisExpedicion, {
     maxSize: 6.8,
-    minSize: 5.6,
+    minSize: 4.6,
     clamp: true,
   });
   drawTextInRect(page1, helvetica, formatDate(formData.fechaExpedicion, "/"), layout.page1.fechaExpedicion, {
@@ -297,37 +297,40 @@ async function fillVisaPdf(formData) {
 
   drawTextInRect(page1, helvetica, toUpper(formData.domicilioActual), layout.page1.domicilioActual, {
     maxSize: 5.8,
-    minSize: 4.8,
+    minSize: 4.2,
     clamp: true,
   });
   drawTextInRect(page1, helvetica, normalizeText(formData.telefono), layout.page1.telefono, {
     maxSize: 6,
-    minSize: 5.2,
+    minSize: 4.4,
     clamp: true,
   });
   const [correoLinea1, correoLinea2] = splitEmailForTwoLines(formData.correo);
   drawTextInRect(page1, helvetica, correoLinea1, layout.page1.correoLinea1, {
-    fixedSize: 5.1,
+    maxSize: 5.1,
+    minSize: 4.2,
     clamp: true,
   });
   drawTextInRect(page1, helvetica, correoLinea2, layout.page1.correoLinea2, {
-    fixedSize: 5.1,
+    maxSize: 5.1,
+    minSize: 4.2,
     clamp: true,
   });
 
   drawTextInRect(page1, helvetica, toUpper(formData.ocupacion), layout.page1.ocupacion, {
     maxSize: 6.4,
-    minSize: 5.2,
+    minSize: 4.2,
     clamp: true,
   });
   drawTextInRect(page1, helvetica, toUpper(formData.compania), layout.page1.compania, {
     maxSize: 5.7,
-    minSize: 4.8,
+    minSize: 4.2,
     clamp: true,
   });
 
   drawTextInRect(page1, helvetica, toUpper(formData.lugarResidencia), layout.page1.lugarResidencia, {
-    fixedSize: 4.7,
+    maxSize: 5.8,
+    minSize: 4.2,
     clamp: true,
   });
   drawMark(page1, helveticaBold, layout.page1.legalEstanciaMarks[formData.cuentaLegalEstancia]);
@@ -335,7 +338,7 @@ async function fillVisaPdf(formData) {
   drawMark(page1, helveticaBold, layout.page1.antecedentesMarks[formData.antecedentesPenales]);
   drawTextInRect(page1, helvetica, toUpper(formData.antecedentesDetalle), layout.page1.antecedentesDetalle, {
     maxSize: 6.2,
-    minSize: 5,
+    minSize: 4.2,
     clamp: true,
   });
 
@@ -347,7 +350,7 @@ async function fillVisaPdf(formData) {
   drawDateParts(page1, helvetica, formData.fechaIngresoMexico, layout.page1.fechaIngresoPartes);
   drawTextInRect(page1, helvetica, toUpper(formData.ciudadIngreso), layout.page1.ciudadIngreso, {
     maxSize: 6.5,
-    minSize: 5.2,
+    minSize: 4.4,
     clamp: true,
   });
 
@@ -357,12 +360,12 @@ async function fillVisaPdf(formData) {
 
   drawTextInRect(page1, helvetica, toUpper(formData.causaDeportacion), layout.page1.causaDeportacion, {
     maxSize: 6.2,
-    minSize: 5,
+    minSize: 4.2,
     clamp: true,
   });
   drawTextInRect(page1, helvetica, toUpper(formData.propositoViaje), layout.page1.propositoViaje, {
     maxSize: 6.4,
-    minSize: 5,
+    minSize: 4.2,
     clamp: true,
   });
 
@@ -383,7 +386,7 @@ async function fillVisaPdf(formData) {
 
   drawTextInRect(page2, helvetica, toUpper(formData.lugarFirma), layout.page2.lugar, {
     maxSize: 6,
-    minSize: 5.2,
+    minSize: 4.2,
     clamp: true,
   });
   drawDateParts(page2, helvetica, formData.fechaFirma, layout.page2.fechaFirmaPartes, {
