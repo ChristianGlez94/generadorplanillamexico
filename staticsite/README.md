@@ -1,6 +1,6 @@
 # Static Site - Planilla Visa México
 
-Sitio estático oficial para presentar la app Android **Planilla Visa México** y enlazar a Google Play.
+Sitio estático de apoyo para presentar la app Android **Planilla Visa México** y enlazar a Google Play. No representa a autoridades ni canales oficiales.
 
 ## Estructura
 
